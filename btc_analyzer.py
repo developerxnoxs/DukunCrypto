@@ -293,9 +293,9 @@ def format_analysis_reply(text):
         return text
 
 
-async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk command /start"""
-    keyboard = [
+def get_timeframe_keyboard():
+    """Generate keyboard untuk pilihan timeframe"""
+    return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("1m", callback_data='1min'),
             InlineKeyboardButton("5m", callback_data='5min'),
@@ -306,8 +306,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("4h", callback_data='4hour'),
             InlineKeyboardButton("1d", callback_data='1day')
         ],
-    ]
-    
+    ])
+
+
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /start"""
     welcome_text = """📊 *BTC/USDT Technical Analysis Bot*
 
 Pilih timeframe untuk analisa teknikal:
@@ -316,7 +319,7 @@ _Chart akan di-generate dengan EMA20 & EMA50, kemudian dianalisa menggunakan AI.
     
     await update.message.reply_text(
         welcome_text,
-        reply_markup=InlineKeyboardMarkup(keyboard),
+        reply_markup=get_timeframe_keyboard(),
         parse_mode='Markdown'
     )
 
@@ -328,49 +331,53 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     
     interval = query.data
     chat_id = query.message.chat_id
+    message_id = query.message.message_id
     
     await query.edit_message_text(f"⏳ Mengambil data BTC/USDT ({interval})...")
     
     data = fetch_btc_kucoin(interval)
     
     if not data:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Gagal mengambil data dari KuCoin. Coba lagi nanti."
+        await query.edit_message_text(
+            text="❌ Gagal mengambil data dari KuCoin. Coba lagi nanti.\n\n📊 Pilih timeframe lain:",
+            reply_markup=get_timeframe_keyboard()
         )
         return
     
     if len(data) < 20:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=f"❌ Data terlalu sedikit ({len(data)} candle). Minimal 20 candle diperlukan."
+        await query.edit_message_text(
+            text=f"❌ Data terlalu sedikit ({len(data)} candle). Minimal 20 candle diperlukan.\n\n📊 Pilih timeframe lain:",
+            reply_markup=get_timeframe_keyboard()
         )
         return
     
-    await context.bot.send_message(chat_id=chat_id, text="📊 Generating chart...")
+    await query.edit_message_text(f"📊 Generating chart BTC/USDT ({interval})...")
     
     filename = f"chart_{interval}_{int(datetime.now().timestamp())}.png"
     chart_path = generate_candlestick_chart(data, filename, interval)
     
     if not chart_path:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Gagal membuat chart. Coba lagi."
+        await query.edit_message_text(
+            text="❌ Gagal membuat chart. Coba lagi.\n\n📊 Pilih timeframe:",
+            reply_markup=get_timeframe_keyboard()
         )
         return
     
+    await query.edit_message_text(f"🤖 Menganalisa chart BTC/USDT ({interval}) dengan AI...")
+    
+    photo_message = None
     try:
         with open(chart_path, "rb") as photo:
-            await context.bot.send_photo(
+            photo_message = await context.bot.send_photo(
                 chat_id=chat_id,
                 photo=photo,
-                caption=f"📊 BTC/USDT Chart ({interval})\n⏳ Menganalisa dengan AI..."
+                caption=f"📊 BTC/USDT Chart ({interval})"
             )
     except Exception as e:
         logger.error(f"Error mengirim photo: {e}")
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="❌ Gagal mengirim chart."
+        await query.edit_message_text(
+            text="❌ Gagal mengirim chart.\n\n📊 Pilih timeframe:",
+            reply_markup=get_timeframe_keyboard()
         )
         return
     
@@ -383,18 +390,20 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
 {formatted}
 
 ━━━━━━━━━━━━━━━━━━━━
-⚠️ _Disclaimer: Ini bukan financial advice. Selalu lakukan riset sendiri._"""
+⚠️ _Disclaimer: Ini bukan financial advice. Selalu lakukan riset sendiri._
+
+📊 *Pilih timeframe untuk analisa lagi:*"""
     
     try:
-        await context.bot.send_message(
-            chat_id=chat_id,
+        await query.edit_message_text(
             text=result_text,
-            parse_mode='Markdown'
+            parse_mode='Markdown',
+            reply_markup=get_timeframe_keyboard()
         )
     except Exception:
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=result_text.replace('*', '').replace('_', '')
+        await query.edit_message_text(
+            text=result_text.replace('*', '').replace('_', '') + "\n\nPilih timeframe untuk analisa lagi:",
+            reply_markup=get_timeframe_keyboard()
         )
     
     try:
