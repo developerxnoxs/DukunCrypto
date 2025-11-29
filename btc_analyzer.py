@@ -379,6 +379,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     
     interval = query.data
     chat_id = query.message.chat_id
+    current_message_id = query.message.message_id
     
     if 'last_chart_message_id' in context.user_data:
         try:
@@ -388,41 +389,51 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             )
         except Exception:
             pass
+        context.user_data.pop('last_chart_message_id', None)
     
-    if 'last_button_message_id' in context.user_data:
-        try:
-            await context.bot.delete_message(
-                chat_id=chat_id,
-                message_id=context.user_data['last_button_message_id']
-            )
-        except Exception:
-            pass
+    status_message = await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"⏳ Mengambil data BTC/USDT ({interval})..."
+    )
     
-    await query.edit_message_text(f"⏳ Mengambil data BTC/USDT ({interval})...")
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=current_message_id)
+    except Exception:
+        pass
     
     data = fetch_btc_kucoin(interval)
     
     if not data:
-        await query.edit_message_text(
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
             text="❌ Gagal mengambil data dari KuCoin. Coba lagi nanti.\n\n📊 Pilih timeframe lain:",
             reply_markup=get_timeframe_keyboard()
         )
         return
     
     if len(data) < 20:
-        await query.edit_message_text(
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
             text=f"❌ Data terlalu sedikit ({len(data)} candle). Minimal 20 candle diperlukan.\n\n📊 Pilih timeframe lain:",
             reply_markup=get_timeframe_keyboard()
         )
         return
     
-    await query.edit_message_text(f"📊 Generating chart BTC/USDT ({interval})...")
+    await context.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=status_message.message_id,
+        text=f"📊 Generating chart BTC/USDT ({interval})..."
+    )
     
     filename = f"chart_{interval}_{int(datetime.now().timestamp())}.png"
     chart_path = generate_candlestick_chart(data, filename, interval)
     
     if not chart_path:
-        await query.edit_message_text(
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
             text="❌ Gagal membuat chart. Coba lagi.\n\n📊 Pilih timeframe:",
             reply_markup=get_timeframe_keyboard()
         )
@@ -439,16 +450,19 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             context.user_data['last_chart_message_id'] = photo_message.message_id
     except Exception as e:
         logger.error(f"Error mengirim photo: {e}")
-        await query.edit_message_text(
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=status_message.message_id,
             text="❌ Gagal mengirim chart.\n\n📊 Pilih timeframe:",
             reply_markup=get_timeframe_keyboard()
         )
         return
     
-    try:
-        await query.message.delete()
-    except Exception:
-        pass
+    await context.bot.edit_message_text(
+        chat_id=chat_id,
+        message_id=status_message.message_id,
+        text=f"🤖 Menganalisa chart dengan AI..."
+    )
     
     analysis = analyze_image_with_gemini(chart_path)
     formatted = format_analysis_reply(analysis)
@@ -479,20 +493,20 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             logger.error(f"Error edit caption: {e}")
     
     try:
-        button_message = await context.bot.send_message(
+        await context.bot.edit_message_text(
             chat_id=chat_id,
+            message_id=status_message.message_id,
             text="📊 *Pilih timeframe untuk analisa lagi:*",
             parse_mode='Markdown',
             reply_markup=get_timeframe_keyboard()
         )
-        context.user_data['last_button_message_id'] = button_message.message_id
     except Exception:
-        button_message = await context.bot.send_message(
+        await context.bot.edit_message_text(
             chat_id=chat_id,
+            message_id=status_message.message_id,
             text="📊 Pilih timeframe untuk analisa lagi:",
             reply_markup=get_timeframe_keyboard()
         )
-        context.user_data['last_button_message_id'] = button_message.message_id
     
     try:
         os.remove(chart_path)
