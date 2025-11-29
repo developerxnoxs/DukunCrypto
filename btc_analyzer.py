@@ -247,25 +247,19 @@ def format_analysis_reply(text):
     text_clean = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)
     text_clean = re.sub(r'\*([^*]+)\*', r'\1', text_clean)
     text_clean = re.sub(r'`([^`]+)`', r'\1', text_clean)
+    text_clean = re.sub(r'^\s*[-•]\s*', '', text_clean, flags=re.MULTILINE)
     
-    section_config = {
-        'sinyal': {'emoji': '📊', 'label': 'SINYAL', 'group': 'signal'},
-        'signal': {'emoji': '📊', 'label': 'SIGNAL', 'group': 'signal'},
-        'entry': {'emoji': '🎯', 'label': 'ENTRY', 'group': 'trading'},
-        'take profit': {'emoji': '💰', 'label': 'TAKE PROFIT', 'group': 'trading'},
-        'tp1': {'emoji': '   💰', 'label': 'TP1', 'group': 'trading'},
-        'tp2': {'emoji': '   💰', 'label': 'TP2', 'group': 'trading'},
-        'tp': {'emoji': '💰', 'label': 'TP', 'group': 'trading'},
-        'stop loss': {'emoji': '🛑', 'label': 'STOP LOSS', 'group': 'trading'},
-        'sl': {'emoji': '🛑', 'label': 'SL', 'group': 'trading'},
-        'pola': {'emoji': '🕯️', 'label': 'POLA', 'group': 'analysis'},
-        'pattern': {'emoji': '🕯️', 'label': 'PATTERN', 'group': 'analysis'},
-        'trend': {'emoji': '📈', 'label': 'TREND', 'group': 'analysis'},
-        'support': {'emoji': '🔻', 'label': 'SUPPORT', 'group': 'levels'},
-        'resistance': {'emoji': '🔺', 'label': 'RESISTANCE', 'group': 'levels'},
-        'kesimpulan': {'emoji': '🧠', 'label': 'KESIMPULAN', 'group': 'conclusion'},
-        'conclusion': {'emoji': '🧠', 'label': 'CONCLUSION', 'group': 'conclusion'}
-    }
+    section_keywords = [
+        {'keywords': ['sinyal', 'signal'], 'emoji': '📊', 'group': 'signal'},
+        {'keywords': ['entry', 'masuk'], 'emoji': '🎯', 'group': 'trading'},
+        {'keywords': ['take profit', 'target', 'tp1', 'tp2', 'tp 1', 'tp 2'], 'emoji': '💰', 'group': 'trading'},
+        {'keywords': ['stop loss', 'stoploss', 'sl', 'cut loss'], 'emoji': '🛑', 'group': 'trading'},
+        {'keywords': ['pola', 'pattern', 'candlestick', 'candle'], 'emoji': '🕯️', 'group': 'analysis'},
+        {'keywords': ['trend', 'arah'], 'emoji': '📈', 'group': 'analysis'},
+        {'keywords': ['support', 'suport', 's1', 's2', 's3'], 'emoji': '🔻', 'group': 'levels'},
+        {'keywords': ['resistance', 'resisten', 'r1', 'r2', 'r3'], 'emoji': '🔺', 'group': 'levels'},
+        {'keywords': ['kesimpulan', 'conclusion', 'ringkasan', 'summary'], 'emoji': '🧠', 'group': 'conclusion'},
+    ]
     
     sections = {
         'signal': [],
@@ -288,50 +282,58 @@ def format_analysis_reply(text):
             key = parts[0].strip().lower()
             value = parts[1].strip() if len(parts) > 1 else ''
             
+            if not value:
+                continue
+            
             matched = False
-            for keyword, config in section_config.items():
-                if keyword in key:
-                    emoji = config['emoji']
-                    label = parts[0].strip().upper()
-                    formatted_line = f"{emoji} *{label}:*\n{value}"
-                    sections[config['group']].append(formatted_line)
-                    matched = True
+            for config in section_keywords:
+                for keyword in config['keywords']:
+                    if keyword in key or key in keyword:
+                        emoji = config['emoji']
+                        label = parts[0].strip().upper()
+                        formatted_line = f"{emoji} *{label}:*\n{value}"
+                        sections[config['group']].append(formatted_line)
+                        matched = True
+                        break
+                if matched:
                     break
             
-            if not matched and value:
+            if not matched and value and len(value) > 3:
                 sections['other'].append(f"• {parts[0].strip()}: {value}")
         else:
-            if line and not line.startswith('Oke') and not line.startswith('Berikut'):
+            skip_phrases = ['oke', 'berikut', 'analisa', 'berdasarkan', 'chart', 'gambar']
+            should_skip = any(phrase in line.lower() for phrase in skip_phrases)
+            if line and not should_skip and len(line) > 10:
                 sections['other'].append(line)
     
     result_parts = []
     
     if sections['signal']:
-        result_parts.append('\n'.join(sections['signal']))
+        result_parts.append('\n\n'.join(sections['signal']))
     
     if sections['trading']:
         if result_parts:
             result_parts.append('')
         result_parts.append('─── Trading Setup ───')
-        result_parts.append('\n'.join(sections['trading']))
+        result_parts.append('\n\n'.join(sections['trading']))
     
     if sections['levels']:
         if result_parts:
             result_parts.append('')
         result_parts.append('─── Support & Resistance ───')
-        result_parts.append('\n'.join(sections['levels']))
+        result_parts.append('\n\n'.join(sections['levels']))
     
     if sections['analysis']:
         if result_parts:
             result_parts.append('')
         result_parts.append('─── Technical Analysis ───')
-        result_parts.append('\n'.join(sections['analysis']))
+        result_parts.append('\n\n'.join(sections['analysis']))
     
     if sections['conclusion']:
         if result_parts:
             result_parts.append('')
         result_parts.append('─── Kesimpulan ───')
-        result_parts.append('\n'.join(sections['conclusion']))
+        result_parts.append('\n\n'.join(sections['conclusion']))
     
     if result_parts:
         return '\n'.join(result_parts)
@@ -377,7 +379,15 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     
     interval = query.data
     chat_id = query.message.chat_id
-    message_id = query.message.message_id
+    
+    if 'last_chart_message_id' in context.user_data:
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=context.user_data['last_chart_message_id']
+            )
+        except Exception:
+            pass
     
     await query.edit_message_text(f"⏳ Mengambil data BTC/USDT ({interval})...")
     
@@ -409,16 +419,15 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         )
         return
     
-    await query.edit_message_text(f"🤖 Menganalisa chart BTC/USDT ({interval}) dengan AI...")
-    
     photo_message = None
     try:
         with open(chart_path, "rb") as photo:
             photo_message = await context.bot.send_photo(
                 chat_id=chat_id,
                 photo=photo,
-                caption=f"📊 BTC/USDT Chart ({interval})"
+                caption=f"📊 BTC/USDT Chart ({interval})\n⏳ Menganalisa dengan AI..."
             )
+            context.user_data['last_chart_message_id'] = photo_message.message_id
     except Exception as e:
         logger.error(f"Error mengirim photo: {e}")
         await query.edit_message_text(
@@ -427,28 +436,46 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         )
         return
     
+    await query.edit_message_text(f"🤖 Menganalisa chart BTC/USDT ({interval}) dengan AI...")
+    
     analysis = analyze_image_with_gemini(chart_path)
     formatted = format_analysis_reply(analysis)
     
-    result_text = f"""📈 *Hasil Analisa BTC/USDT ({interval})*
+    caption_text = f"""📈 *Hasil Analisa BTC/USDT ({interval})*
 ━━━━━━━━━━━━━━━━━━━━
 
 {formatted}
 
 ━━━━━━━━━━━━━━━━━━━━
-⚠️ _Disclaimer: Ini bukan financial advice. Selalu lakukan riset sendiri._
-
-📊 *Pilih timeframe untuk analisa lagi:*"""
+⚠️ _Disclaimer: Ini bukan financial advice._"""
     
     try:
+        await context.bot.edit_message_caption(
+            chat_id=chat_id,
+            message_id=photo_message.message_id,
+            caption=caption_text,
+            parse_mode='Markdown'
+        )
+    except Exception:
+        try:
+            await context.bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=photo_message.message_id,
+                caption=caption_text.replace('*', '').replace('_', '')
+            )
+        except Exception as e:
+            logger.error(f"Error edit caption: {e}")
+    
+    select_text = "📊 *Pilih timeframe untuk analisa lagi:*"
+    try:
         await query.edit_message_text(
-            text=result_text,
+            text=select_text,
             parse_mode='Markdown',
             reply_markup=get_timeframe_keyboard()
         )
     except Exception:
         await query.edit_message_text(
-            text=result_text.replace('*', '').replace('_', '') + "\n\nPilih timeframe untuk analisa lagi:",
+            text="📊 Pilih timeframe untuk analisa lagi:",
             reply_markup=get_timeframe_keyboard()
         )
     
