@@ -75,23 +75,31 @@ def fetch_xauusd_data(interval="1hour"):
             logger.warning("Tidak ada data XAUUSD dari Yahoo Finance")
             return None
         
-        # Convert to candlestick format
+        # Drop NaN values
+        df = df.dropna()
+        if df.empty:
+            logger.warning("Semua data XAUUSD adalah NaN")
+            return None
+        
+        # Convert to candlestick format (list of arrays like btc_analyzer)
         candles = []
         for timestamp, row in df.iterrows():
-            candles.append({
-                "time": int(timestamp.timestamp()),
-                "open": float(row.get("Open", 0)),
-                "high": float(row.get("High", 0)),
-                "low": float(row.get("Low", 0)),
-                "close": float(row.get("Close", 0)),
-                "volume": float(row.get("Volume", 0))
-            })
+            candles.append([
+                int(timestamp.timestamp()),
+                float(row["Open"]),
+                float(row["Close"]),
+                float(row["High"]),
+                float(row["Low"]),
+                float(row["Volume"])
+            ])
         
         logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD")
         return candles[-200:] if len(candles) > 200 else candles
         
     except Exception as e:
         logger.error(f"Error mengambil data XAUUSD: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
@@ -120,22 +128,18 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
     try:
         ohlc = []
         for item in data:
-            ts = datetime.fromtimestamp(item.get("time", 0), tz=tz("Asia/Jakarta"))
+            ts = datetime.fromtimestamp(int(item[0]), tz=tz("Asia/Jakarta"))
             ohlc.append([
                 ts,
-                float(item.get("open", 0)),
-                float(item.get("high", 0)),
-                float(item.get("low", 0)),
-                float(item.get("close", 0)),
-                float(item.get("volume", 0))
+                float(item[1]),
+                float(item[3]),
+                float(item[4]),
+                float(item[2]),
+                float(item[5])
             ])
         
         df = pd.DataFrame(ohlc, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
         df.set_index("Date", inplace=True)
-        
-        if df.empty or len(df) < 5:
-            logger.error("Data tidak cukup untuk generate chart")
-            return None
 
         mc = mpf.make_marketcolors(
             up='#00AA00', down='#FF0000',
@@ -154,8 +158,8 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
         ema50 = df['Close'].ewm(span=50, adjust=False).mean()
         
         addplots = [
-            mpf.make_addplot(ema20, color='#00BFFF', width=1.2, label='EMA20'),
-            mpf.make_addplot(ema50, color='#FF6347', width=1.2, label='EMA50')
+            mpf.make_addplot(ema20, color='blue', width=1, label='EMA20'),
+            mpf.make_addplot(ema50, color='orange', width=1, label='EMA50')
         ]
 
         mpf.plot(
@@ -176,6 +180,8 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
         
     except Exception as e:
         logger.error(f"Error generate chart: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
