@@ -63,11 +63,8 @@ def fetch_xauusd_data(interval="1hour"):
         # Download data using yfinance
         ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
         
-        # Determine period based on interval - use less data for intraday to avoid weekend gaps
-        if interval in ["1min", "5min", "15min", "30min"]:
-            period = "3d"  # Changed from 5d to 3d to avoid weekend data
-        else:
-            period = "1y"
+        # Use only today's data for optimal chart and Gemini analysis
+        period = "1d"
         
         df = ticker.history(period=period, interval=yf_interval)
         
