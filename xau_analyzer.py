@@ -2,7 +2,7 @@
 """
 XAUUSD (Gold) Technical Analysis Bot
 Tool CLI untuk analisa teknikal Gold/XAUUSD menggunakan Telegram Bot dan Gemini AI Vision
-Menggunakan Alpha Vantage API untuk data historical gold
+Menggunakan Finnhub API untuk data historical gold
 """
 
 import logging
@@ -14,7 +14,7 @@ import sys
 import requests
 import mplfinance as mpf
 import pandas as pd
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from pytz import timezone as tz
@@ -27,24 +27,34 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_XAU", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-ALPHAVANTAGE_API_KEY = os.environ.get("ALPHAVANTAGE_API_KEY", "")
+FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY", "")
 
 INTERVAL_MAP = {
-    "1min": "1min",
-    "5min": "5min",
-    "15min": "15min",
-    "30min": "30min",
-    "1hour": "60min",
-    "4hour": "daily",
-    "1day": "daily",
+    "1min": 60,
+    "5min": 300,
+    "15min": 900,
+    "30min": 1800,
+    "1hour": 3600,
+    "4hour": 14400,
+    "1day": 86400,
+}
+
+FINNHUB_INTERVAL = {
+    "1min": "1",
+    "5min": "5",
+    "15min": "15",
+    "30min": "30",
+    "1hour": "60",
+    "4hour": "D",
+    "1day": "D",
 }
 
 
 def fetch_xauusd_data(interval="1hour"):
-    """Mengambil data candlestick XAUUSD dari Alpha Vantage API"""
+    """Mengambil data candlestick XAUUSD dari Finnhub API"""
     
-    if not ALPHAVANTAGE_API_KEY:
-        logger.error("ALPHAVANTAGE_API_KEY tidak ditemukan")
+    if not FINNHUB_API_KEY:
+        logger.error("FINNHUB_API_KEY tidak ditemukan")
         return None
     
     if interval not in INTERVAL_MAP:
@@ -54,83 +64,64 @@ def fetch_xauusd_data(interval="1hour"):
     try:
         logger.info(f"Mengambil data XAUUSD interval {interval}...")
         
-        av_interval = INTERVAL_MAP[interval]
+        fb_interval = FINNHUB_INTERVAL[interval]
         
-        if av_interval == "daily":
-            function = "FX_DAILY"
-            params = {
-                "function": function,
-                "from_symbol": "XAU",
-                "to_symbol": "USD",
-                "apikey": ALPHAVANTAGE_API_KEY,
-                "outputsize": "full"
-            }
-        else:
-            function = "FX_INTRADAY"
-            params = {
-                "function": function,
-                "from_symbol": "XAU",
-                "to_symbol": "USD",
-                "interval": av_interval,
-                "apikey": ALPHAVANTAGE_API_KEY,
-                "outputsize": "full"
-            }
+        # Hitung waktu untuk request
+        now = datetime.now(timezone.utc)
+        start_time = int((now - timedelta(days=30)).timestamp())
+        end_time = int(now.timestamp())
         
         response = requests.get(
-            "https://www.alphavantage.co/query",
-            params=params,
+            "https://finnhub.io/api/v1/forex/candle",
+            params={
+                "symbol": "OANDA:XAU_USD",
+                "resolution": fb_interval,
+                "from": start_time,
+                "to": end_time,
+                "token": FINNHUB_API_KEY
+            },
             timeout=30
         )
         
         response.raise_for_status()
         data = response.json()
         
-        # Check for errors from Alpha Vantage
-        if "Error Message" in data:
-            logger.error(f"Alpha Vantage error: {data['Error Message']}")
+        # Check for errors
+        if data.get("s") == "no_data":
+            logger.warning("Tidak ada data XAUUSD dari Finnhub")
             return None
         
-        if "Note" in data:
-            logger.error("Alpha Vantage rate limit reached")
+        if "o" not in data or not data.get("o"):
+            logger.error(f"Response format tidak expected: {data}")
             return None
         
-        # Extract time series data based on interval
-        # Alpha Vantage FX API uses specific key names
-        if av_interval == "daily":
-            time_series_key = "Time Series FX (Daily)"
-        else:
-            # All intraday intervals use the same key
-            time_series_key = "Time Series FX (Intraday)"
-        
-        if time_series_key not in data:
-            logger.warning(f"Data time series '{time_series_key}' tidak ditemukan.")
-            logger.warning(f"Response keys: {list(data.keys())}")
-            if "Meta Data" in data:
-                logger.warning(f"Meta Data: {data['Meta Data']}")
-            return None
-        
-        time_series = data[time_series_key]
-        
-        # Convert to candlestick format
+        # Convert Finnhub format to candlestick format
         candles = []
-        for timestamp_str, ohlc in list(time_series.items())[:200]:
+        opens = data.get("o", [])
+        highs = data.get("h", [])
+        lows = data.get("l", [])
+        closes = data.get("c", [])
+        timestamps = data.get("t", [])
+        volumes = data.get("v", [])
+        
+        for i, ts in enumerate(timestamps[-200:]):  # Take last 200 candles
             candles.append({
-                "time": timestamp_str,
-                "open": float(ohlc.get("1. open", 0)),
-                "high": float(ohlc.get("2. high", 0)),
-                "low": float(ohlc.get("3. low", 0)),
-                "close": float(ohlc.get("4. close", 0)),
-                "volume": 0
+                "time": ts,
+                "open": float(opens[i]) if i < len(opens) else 0,
+                "high": float(highs[i]) if i < len(highs) else 0,
+                "low": float(lows[i]) if i < len(lows) else 0,
+                "close": float(closes[i]) if i < len(closes) else 0,
+                "volume": float(volumes[i]) if i < len(volumes) else 0
             })
         
         logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD")
         return candles
         
     except requests.exceptions.Timeout:
-        logger.error("Timeout saat mengambil data dari Alpha Vantage")
+        logger.error("Timeout saat mengambil data dari Finnhub")
         return None
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error request Alpha Vantage: {e}")
+        logger.error(f"Error request Finnhub: {e}")
         return None
     except Exception as e:
         logger.error(f"Error tidak terduga: {e}")
@@ -138,27 +129,23 @@ def fetch_xauusd_data(interval="1hour"):
 
 
 def get_current_gold_price():
-    """Mengambil harga gold terkini dari Alpha Vantage"""
-    if not ALPHAVANTAGE_API_KEY:
+    """Mengambil harga gold terkini dari Finnhub"""
+    if not FINNHUB_API_KEY:
         return None
     
     try:
         response = requests.get(
-            "https://www.alphavantage.co/query",
+            "https://finnhub.io/api/v1/quote",
             params={
-                "function": "CURRENCY_EXCHANGE_RATE",
-                "from_currency": "XAU",
-                "to_currency": "USD",
-                "apikey": ALPHAVANTAGE_API_KEY
+                "symbol": "OANDA:XAU_USD",
+                "token": FINNHUB_API_KEY
             },
             timeout=10
         )
         
         if response.status_code == 200:
             data = response.json()
-            if "Realtime Currency Exchange Rate" in data:
-                exchange_rate = data["Realtime Currency Exchange Rate"]
-                return float(exchange_rate.get("5. Exchange Rate", 0))
+            return data.get("c")  # current price
     except Exception as e:
         logger.error(f"Error getting gold price: {e}")
     return None
@@ -173,12 +160,7 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
     try:
         ohlc = []
         for item in data:
-            try:
-                ts = datetime.fromisoformat(item.get("time", "").replace("Z", "+00:00"))
-                ts = ts.astimezone(tz("Asia/Jakarta"))
-            except:
-                ts = datetime.now(tz("Asia/Jakarta"))
-            
+            ts = datetime.fromtimestamp(item.get("time", 0), tz=tz("Asia/Jakarta"))
             ohlc.append([
                 ts,
                 float(item.get("open", 0)),
@@ -482,7 +464,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal mengambil data XAUUSD. Pastikan ALPHAVANTAGE_API_KEY sudah di-set.\n\n🥇 Pilih timeframe lain:",
+            text="❌ Gagal mengambil data XAUUSD. Pastikan FINNHUB_API_KEY sudah di-set.\n\n🥇 Pilih timeframe lain:",
             reply_markup=get_timeframe_keyboard()
         )
         return
@@ -608,7 +590,7 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = fetch_xauusd_data(interval)
     if not data or len(data) < 20:
-        await update.message.reply_text("❌ Gagal mengambil data. Pastikan ALPHAVANTAGE_API_KEY sudah di-set.")
+        await update.message.reply_text("❌ Gagal mengambil data. Pastikan FINNHUB_API_KEY sudah di-set.")
         return
     
     await update.message.reply_text("📊 Generating chart...")
@@ -653,7 +635,7 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "❌ Gagal mengambil harga gold. Pastikan ALPHAVANTAGE_API_KEY sudah di-set."
+            "❌ Gagal mengambil harga gold. Pastikan FINNHUB_API_KEY sudah di-set."
         )
 
 
@@ -677,7 +659,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Entry, TP, dan SL recommendation
 
 *API yang digunakan:*
-• Alpha Vantage - XAUUSD historical data
+• Finnhub - XAUUSD historical candlestick data
 • Google Gemini Vision - AI Analysis
 
 ⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""
@@ -698,11 +680,11 @@ def main():
         print("Buat bot baru di @BotFather untuk XAUUSD analyzer")
         sys.exit(1)
     
-    if not ALPHAVANTAGE_API_KEY:
-        print("⚠️ Warning: ALPHAVANTAGE_API_KEY tidak ditemukan!")
+    if not FINNHUB_API_KEY:
+        print("⚠️ Warning: FINNHUB_API_KEY tidak ditemukan!")
         print("Data XAUUSD tidak akan bisa diambil tanpa API key.")
-        print("Dapatkan API key gratis di: https://www.alphavantage.co/")
-        print("Set environment variable: export ALPHAVANTAGE_API_KEY='your_key'")
+        print("Dapatkan API key gratis di: https://finnhub.io/")
+        print("Set environment variable: export FINNHUB_API_KEY='your_key'")
     
     if not GEMINI_API_KEY:
         print("⚠️ Warning: GEMINI_API_KEY tidak ditemukan!")
@@ -711,7 +693,7 @@ def main():
     
     print("🥇 Starting XAUUSD (Gold) Analysis Bot...")
     print(f"📊 Telegram Token: {TELEGRAM_BOT_TOKEN[:10]}...")
-    print(f"🔑 Alpha Vantage: {'Configured' if ALPHAVANTAGE_API_KEY else 'Not configured'}")
+    print(f"🔑 Finnhub API: {'Configured' if FINNHUB_API_KEY else 'Not configured'}")
     print(f"🤖 Gemini API: {'Configured' if GEMINI_API_KEY else 'Not configured'}")
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
