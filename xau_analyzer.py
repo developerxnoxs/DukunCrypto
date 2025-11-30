@@ -63,8 +63,8 @@ def fetch_xauusd_data(interval="1hour"):
         # Download data using yfinance
         ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
         
-        # Use only today's data for optimal chart and Gemini analysis
-        period = "1d"
+        # Fetch longer period to ensure data availability, then filter to today only
+        period = "60d"
         
         df = ticker.history(period=period, interval=yf_interval)
         
@@ -76,6 +76,23 @@ def fetch_xauusd_data(interval="1hour"):
         df = df.dropna()
         if df.empty:
             logger.warning("Semua data XAUUSD adalah NaN")
+            return None
+        
+        # Filter to today's data only (last 24 hours)
+        now = datetime.now(timezone.utc)
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        df = df[df.index >= start_of_day]
+        
+        if df.empty:
+            logger.warning("Tidak ada data XAUUSD untuk hari ini")
+            # Fallback: ambil 24 jam terakhir
+            df = ticker.history(period=period, interval=yf_interval).dropna()
+            if not df.empty:
+                last_24h = df.iloc[-200:] if len(df) > 200 else df
+                df = last_24h
+        
+        if df.empty:
+            logger.warning("Tidak ada data XAUUSD yang tersedia")
             return None
         
         # For intraday, remove outlier volumes (likely flash trades/gaps)
