@@ -1,14 +1,35 @@
-# BTC/USDT Technical Analysis Bot
+# Multi-Coin Technical Analysis Bot (Advanced Version)
 
-Bot Telegram untuk analisa teknikal Bitcoin (BTC/USDT) menggunakan AI Gemini Vision.
+Bot Telegram untuk analisa teknikal cryptocurrency menggunakan AI Gemini Vision.
 
 ## Fitur
 
+- **14 Cryptocurrency Didukung**: BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, MATIC, LINK, DOT, ATOM, UNI, LTC
 - Chart candlestick real-time dari KuCoin API
 - Indikator EMA20 dan EMA50
 - Analisa AI menggunakan Google Gemini Vision
-- Multiple timeframe: 1m, 5m, 15m, 1h, 4h, 1d
+- Multiple timeframe: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w
+- Interactive keyboard untuk navigasi mudah
 - Output terstruktur dengan sinyal trading
+
+## Cryptocurrency yang Didukung
+
+| Symbol | Name | Emoji |
+|--------|------|-------|
+| BTC | Bitcoin | ₿ |
+| ETH | Ethereum | Ξ |
+| SOL | Solana | ◎ |
+| BNB | BNB | 🔶 |
+| XRP | Ripple | ✕ |
+| ADA | Cardano | ₳ |
+| DOGE | Dogecoin | 🐕 |
+| AVAX | Avalanche | 🔺 |
+| MATIC | Polygon | ⬡ |
+| LINK | Chainlink | ⬡ |
+| DOT | Polkadot | ● |
+| ATOM | Cosmos | ⚛ |
+| UNI | Uniswap | 🦄 |
+| LTC | Litecoin | Ł |
 
 ## Output Analisa
 
@@ -42,24 +63,26 @@ GEMINI_API_KEY=your_gemini_api_key
 ## Cara Penggunaan
 
 1. Start bot dengan command `/start`
-2. Pilih timeframe yang diinginkan (1m, 5m, 15m, 1h, 4h, 1d)
-3. Bot akan generate chart dan menganalisa dengan AI
-4. Hasil analisa akan ditampilkan beserta chart
-5. Pilih timeframe lain untuk analisa ulang
+2. Pilih cryptocurrency yang ingin dianalisa
+3. Pilih timeframe yang diinginkan (1m - 1w)
+4. Bot akan generate chart dan menganalisa dengan AI
+5. Hasil analisa akan ditampilkan beserta chart
+6. Pilih coin atau timeframe lain untuk analisa ulang
 
 ## Commands
 
-- `/start` - Memulai bot dan menampilkan pilihan timeframe
-- `/analyze <timeframe>` - Analisa langsung (contoh: `/analyze 15min`)
+- `/start` - Memulai bot dan menampilkan pilihan coin
+- `/analyze <coin> <timeframe>` - Analisa langsung (contoh: `/analyze BTC 15min`)
+- `/coins` - Lihat daftar coin yang didukung dengan harga terkini
 - `/help` - Menampilkan bantuan
 
 ## Screenshot
 
 ```
 [GAMBAR CHART]
-📊 BTC/USDT Chart (15min)
+₿ BTC/USDT Chart (15min)
 
-📈 Hasil Analisa BTC/USDT (15min)
+₿ Hasil Analisa BTC/USDT (15min)
 ━━━━━━━━━━━━━━━━━━━━
 
 📊 SINYAL:

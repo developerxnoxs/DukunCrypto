@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-BTC/USDT Technical Analysis Bot
-Tool CLI untuk analisa teknikal menggunakan Telegram Bot dan Gemini AI Vision
+Multi-Coin Technical Analysis Bot (Advanced Version)
+Tool CLI untuk analisa teknikal crypto menggunakan Telegram Bot dan Gemini AI Vision
+Mendukung: BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, MATIC, LINK, DOT, ATOM, UNI, LTC
 """
 
 import logging
@@ -28,6 +29,23 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
+SUPPORTED_COINS = {
+    "BTC": {"name": "Bitcoin", "emoji": "₿", "color": "#F7931A"},
+    "ETH": {"name": "Ethereum", "emoji": "Ξ", "color": "#627EEA"},
+    "SOL": {"name": "Solana", "emoji": "◎", "color": "#00FFA3"},
+    "BNB": {"name": "BNB", "emoji": "🔶", "color": "#F3BA2F"},
+    "XRP": {"name": "Ripple", "emoji": "✕", "color": "#23292F"},
+    "ADA": {"name": "Cardano", "emoji": "₳", "color": "#0033AD"},
+    "DOGE": {"name": "Dogecoin", "emoji": "🐕", "color": "#C2A633"},
+    "AVAX": {"name": "Avalanche", "emoji": "🔺", "color": "#E84142"},
+    "MATIC": {"name": "Polygon", "emoji": "⬡", "color": "#8247E5"},
+    "LINK": {"name": "Chainlink", "emoji": "⬡", "color": "#2A5ADA"},
+    "DOT": {"name": "Polkadot", "emoji": "●", "color": "#E6007A"},
+    "ATOM": {"name": "Cosmos", "emoji": "⚛", "color": "#2E3148"},
+    "UNI": {"name": "Uniswap", "emoji": "🦄", "color": "#FF007A"},
+    "LTC": {"name": "Litecoin", "emoji": "Ł", "color": "#345D9D"},
+}
+
 INTERVAL_MAP = {
     "1min": 60, "3min": 180, "5min": 300, "15min": 900,
     "30min": 1800, "1hour": 3600, "2hour": 7200,
@@ -36,9 +54,9 @@ INTERVAL_MAP = {
 }
 
 
-def fetch_btc_kucoin(interval="15min", candle_limit=200):
-    """Mengambil data candlestick BTC/USDT dari KuCoin API"""
-    symbol = "BTC-USDT"
+def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
+    """Mengambil data candlestick dari KuCoin API untuk berbagai coin"""
+    pair = f"{symbol}-USDT"
     
     if interval not in INTERVAL_MAP:
         logger.error(f"Interval tidak valid: {interval}")
@@ -48,11 +66,11 @@ def fetch_btc_kucoin(interval="15min", candle_limit=200):
     start_at = end_at - INTERVAL_MAP[interval] * candle_limit
 
     try:
-        logger.info(f"Mengambil data {symbol} interval {interval}...")
+        logger.info(f"Mengambil data {pair} interval {interval}...")
         response = requests.get(
             "https://api.kucoin.com/api/v1/market/candles",
             params={
-                "symbol": symbol,
+                "symbol": pair,
                 "type": interval,
                 "startAt": start_at,
                 "endAt": end_at
@@ -72,7 +90,7 @@ def fetch_btc_kucoin(interval="15min", candle_limit=200):
             return None
             
         sorted_candles = sorted(candles, key=lambda x: int(x[0]))
-        logger.info(f"Berhasil mengambil {len(sorted_candles)} candle")
+        logger.info(f"Berhasil mengambil {len(sorted_candles)} candle untuk {pair}")
         return sorted_candles
         
     except requests.exceptions.Timeout:
@@ -86,11 +104,30 @@ def fetch_btc_kucoin(interval="15min", candle_limit=200):
         return None
 
 
-def generate_candlestick_chart(data, filename="chart.png", tf="15min"):
+def get_current_price(symbol="BTC"):
+    """Mengambil harga terkini dari KuCoin"""
+    pair = f"{symbol}-USDT"
+    try:
+        response = requests.get(
+            f"https://api.kucoin.com/api/v1/market/orderbook/level1",
+            params={"symbol": pair},
+            timeout=10
+        )
+        data = response.json()
+        if data.get("code") == "200000" and data.get("data"):
+            return float(data["data"].get("price", 0))
+    except Exception as e:
+        logger.error(f"Error getting price: {e}")
+    return None
+
+
+def generate_candlestick_chart(data, filename="chart.png", symbol="BTC", tf="15min"):
     """Generate chart candlestick dari data OHLCV"""
     if not data:
         logger.error("Data kosong, tidak bisa generate chart")
         return None
+    
+    coin_info = SUPPORTED_COINS.get(symbol, {"name": symbol, "color": "#26a69a"})
     
     try:
         ohlc = []
@@ -131,7 +168,7 @@ def generate_candlestick_chart(data, filename="chart.png", tf="15min"):
 
         mpf.plot(
             df, type='candle', volume=True, style=style,
-            title=f"\nBTC/USDT ({tf}) - KuCoin",
+            title=f"\n{symbol}/USDT ({tf}) - KuCoin",
             ylabel="Price (USDT)",
             ylabel_lower="Volume",
             savefig=dict(fname=filename, dpi=150, bbox_inches='tight'),
@@ -150,10 +187,12 @@ def generate_candlestick_chart(data, filename="chart.png", tf="15min"):
         return None
 
 
-def analyze_image_with_gemini(image_path):
+def analyze_image_with_gemini(image_path, symbol="BTC"):
     """Analisa chart menggunakan Gemini Vision API"""
     if not GEMINI_API_KEY:
         return "GEMINI_API_KEY tidak ditemukan. Set environment variable terlebih dahulu."
+    
+    coin_info = SUPPORTED_COINS.get(symbol, {"name": symbol})
     
     try:
         with open(image_path, "rb") as f:
@@ -163,7 +202,7 @@ def analyze_image_with_gemini(image_path):
     except Exception as e:
         return f"Error membaca file: {e}"
 
-    prompt = """Analisa chart candlestick BTC/USDT ini secara teknikal. Berikan analisa dalam format berikut:
+    prompt = f"""Analisa chart candlestick {symbol}/USDT ({coin_info.get('name', symbol)}) ini secara teknikal. Berikan analisa dalam format berikut:
 
 SINYAL: [BUY/SELL/HOLD] - [Alasan singkat]
 ENTRY: [Harga entry yang disarankan]
@@ -197,7 +236,7 @@ Berikan angka spesifik berdasarkan chart yang terlihat. Jika tidak bisa menentuk
     headers = {"Content-Type": "application/json"}
     
     try:
-        logger.info("Mengirim chart ke Gemini untuk analisa...")
+        logger.info(f"Mengirim chart {symbol} ke Gemini untuk analisa...")
         response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=60)
         
         if response.status_code == 200:
@@ -341,33 +380,128 @@ def format_analysis_reply(text):
         return text
 
 
-def get_timeframe_keyboard():
-    """Generate keyboard untuk pilihan timeframe"""
+def get_coin_keyboard():
+    """Generate keyboard untuk pilihan coin - Page 1"""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("1m", callback_data='1min'),
-            InlineKeyboardButton("5m", callback_data='5min'),
-            InlineKeyboardButton("15m", callback_data='15min')
+            InlineKeyboardButton("₿ BTC", callback_data='coin_BTC'),
+            InlineKeyboardButton("Ξ ETH", callback_data='coin_ETH'),
+            InlineKeyboardButton("◎ SOL", callback_data='coin_SOL'),
         ],
         [
-            InlineKeyboardButton("1h", callback_data='1hour'),
-            InlineKeyboardButton("4h", callback_data='4hour'),
-            InlineKeyboardButton("1d", callback_data='1day')
+            InlineKeyboardButton("🔶 BNB", callback_data='coin_BNB'),
+            InlineKeyboardButton("✕ XRP", callback_data='coin_XRP'),
+            InlineKeyboardButton("₳ ADA", callback_data='coin_ADA'),
+        ],
+        [
+            InlineKeyboardButton("🐕 DOGE", callback_data='coin_DOGE'),
+            InlineKeyboardButton("🔺 AVAX", callback_data='coin_AVAX'),
+            InlineKeyboardButton("⬡ MATIC", callback_data='coin_MATIC'),
+        ],
+        [
+            InlineKeyboardButton("⬡ LINK", callback_data='coin_LINK'),
+            InlineKeyboardButton("● DOT", callback_data='coin_DOT'),
+            InlineKeyboardButton("⚛ ATOM", callback_data='coin_ATOM'),
+        ],
+        [
+            InlineKeyboardButton("🦄 UNI", callback_data='coin_UNI'),
+            InlineKeyboardButton("Ł LTC", callback_data='coin_LTC'),
+        ],
+    ])
+
+
+def get_timeframe_keyboard(symbol="BTC"):
+    """Generate keyboard untuk pilihan timeframe"""
+    coin_info = SUPPORTED_COINS.get(symbol, {"emoji": "📊"})
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("1m", callback_data=f'tf_{symbol}_1min'),
+            InlineKeyboardButton("5m", callback_data=f'tf_{symbol}_5min'),
+            InlineKeyboardButton("15m", callback_data=f'tf_{symbol}_15min'),
+            InlineKeyboardButton("30m", callback_data=f'tf_{symbol}_30min'),
+        ],
+        [
+            InlineKeyboardButton("1h", callback_data=f'tf_{symbol}_1hour'),
+            InlineKeyboardButton("4h", callback_data=f'tf_{symbol}_4hour'),
+            InlineKeyboardButton("1d", callback_data=f'tf_{symbol}_1day'),
+            InlineKeyboardButton("1w", callback_data=f'tf_{symbol}_1week'),
+        ],
+        [
+            InlineKeyboardButton("⬅️ Pilih Coin Lain", callback_data='back_to_coins'),
+        ],
+    ])
+
+
+def get_after_analysis_keyboard(symbol="BTC"):
+    """Keyboard setelah analisa selesai"""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(f"🔄 Analisa {symbol} Lagi", callback_data=f'coin_{symbol}'),
+            InlineKeyboardButton("📊 Coin Lain", callback_data='back_to_coins'),
         ],
     ])
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /start"""
-    welcome_text = """📊 *BTC/USDT Technical Analysis Bot*
+    welcome_text = """📊 *Multi-Coin Technical Analysis Bot*
+━━━━━━━━━━━━━━━━━━━━
 
-Pilih timeframe untuk analisa teknikal:
+🚀 *Advanced Version* - Mendukung 14 Cryptocurrency!
 
-_Chart akan di-generate dengan EMA20 & EMA50, kemudian dianalisa menggunakan AI._"""
+*Fitur:*
+• Chart candlestick real-time
+• EMA20 & EMA50 indicators
+• Analisa AI dengan Gemini Vision
+• Multiple timeframe (1m - 1w)
+
+━━━━━━━━━━━━━━━━━━━━
+*Pilih cryptocurrency untuk dianalisa:*"""
     
     await update.message.reply_text(
         welcome_text,
-        reply_markup=get_timeframe_keyboard(),
+        reply_markup=get_coin_keyboard(),
+        parse_mode='Markdown'
+    )
+
+
+async def handle_coin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk callback button pemilihan coin"""
+    query = update.callback_query
+    await query.answer()
+    
+    symbol = query.data.replace('coin_', '')
+    coin_info = SUPPORTED_COINS.get(symbol, {"name": symbol, "emoji": "📊"})
+    
+    context.user_data['selected_coin'] = symbol
+    
+    current_price = get_current_price(symbol)
+    price_text = f"💵 Harga: ${current_price:,.2f}" if current_price else ""
+    
+    text = f"""{coin_info['emoji']} *{symbol}/USDT* - {coin_info['name']}
+{price_text}
+
+📈 *Pilih timeframe untuk analisa:*"""
+    
+    await query.edit_message_text(
+        text=text,
+        reply_markup=get_timeframe_keyboard(symbol),
+        parse_mode='Markdown'
+    )
+
+
+async def handle_back_to_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk kembali ke pilihan coin"""
+    query = update.callback_query
+    await query.answer()
+    
+    text = """📊 *Multi-Coin Technical Analysis Bot*
+━━━━━━━━━━━━━━━━━━━━
+*Pilih cryptocurrency untuk dianalisa:*"""
+    
+    await query.edit_message_text(
+        text=text,
+        reply_markup=get_coin_keyboard(),
         parse_mode='Markdown'
     )
 
@@ -377,9 +511,14 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     query = update.callback_query
     await query.answer()
     
-    interval = query.data
+    data_parts = query.data.replace('tf_', '').split('_')
+    symbol = data_parts[0]
+    interval = data_parts[1]
+    
     chat_id = query.message.chat_id
     current_message_id = query.message.message_id
+    
+    coin_info = SUPPORTED_COINS.get(symbol, {"name": symbol, "emoji": "📊"})
     
     if 'last_chart_message_id' in context.user_data:
         try:
@@ -413,7 +552,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     
     status_message = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⏳ Mengambil data BTC/USDT ({interval})..."
+        text=f"⏳ Mengambil data {coin_info['emoji']} {symbol}/USDT ({interval})..."
     )
     
     try:
@@ -421,14 +560,14 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     except Exception:
         pass
     
-    data = fetch_btc_kucoin(interval)
+    data = fetch_crypto_kucoin(symbol, interval)
     
     if not data:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal mengambil data dari KuCoin. Coba lagi nanti.\n\n📊 Pilih timeframe lain:",
-            reply_markup=get_timeframe_keyboard()
+            text=f"❌ Gagal mengambil data {symbol} dari KuCoin. Coba lagi nanti.",
+            reply_markup=get_after_analysis_keyboard(symbol)
         )
         return
     
@@ -436,26 +575,26 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text=f"❌ Data terlalu sedikit ({len(data)} candle). Minimal 20 candle diperlukan.\n\n📊 Pilih timeframe lain:",
-            reply_markup=get_timeframe_keyboard()
+            text=f"❌ Data terlalu sedikit ({len(data)} candle). Minimal 20 candle diperlukan.",
+            reply_markup=get_after_analysis_keyboard(symbol)
         )
         return
     
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=status_message.message_id,
-        text=f"📊 Generating chart BTC/USDT ({interval})..."
+        text=f"📊 Generating chart {coin_info['emoji']} {symbol}/USDT ({interval})..."
     )
     
-    filename = f"chart_{interval}_{int(datetime.now().timestamp())}.png"
-    chart_path = generate_candlestick_chart(data, filename, interval)
+    filename = f"chart_{symbol}_{interval}_{int(datetime.now().timestamp())}.png"
+    chart_path = generate_candlestick_chart(data, filename, symbol, interval)
     
     if not chart_path:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal membuat chart. Coba lagi.\n\n📊 Pilih timeframe:",
-            reply_markup=get_timeframe_keyboard()
+            text="❌ Gagal membuat chart. Coba lagi.",
+            reply_markup=get_after_analysis_keyboard(symbol)
         )
         return
     
@@ -465,7 +604,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             photo_message = await context.bot.send_photo(
                 chat_id=chat_id,
                 photo=photo,
-                caption=f"📊 BTC/USDT Chart ({interval})"
+                caption=f"{coin_info['emoji']} {symbol}/USDT Chart ({interval})"
             )
             context.user_data['last_chart_message_id'] = photo_message.message_id
     except Exception as e:
@@ -473,21 +612,21 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal mengirim chart.\n\n📊 Pilih timeframe:",
-            reply_markup=get_timeframe_keyboard()
+            text="❌ Gagal mengirim chart.",
+            reply_markup=get_after_analysis_keyboard(symbol)
         )
         return
     
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=status_message.message_id,
-        text=f"🤖 Menganalisa chart dengan AI..."
+        text=f"🤖 Menganalisa chart {symbol} dengan AI..."
     )
     
-    analysis = analyze_image_with_gemini(chart_path)
+    analysis = analyze_image_with_gemini(chart_path, symbol)
     formatted = format_analysis_reply(analysis)
     
-    result_text = f"""📈 *Hasil Analisa BTC/USDT ({interval})*
+    result_text = f"""{coin_info['emoji']} *Hasil Analisa {symbol}/USDT ({interval})*
 ━━━━━━━━━━━━━━━━━━━━
 
 {formatted}
@@ -514,16 +653,16 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     try:
         button_message = await context.bot.send_message(
             chat_id=chat_id,
-            text="📊 *Pilih timeframe untuk analisa lagi:*",
+            text="📊 *Lanjutkan analisa:*",
             parse_mode='Markdown',
-            reply_markup=get_timeframe_keyboard()
+            reply_markup=get_after_analysis_keyboard(symbol)
         )
         context.user_data['last_button_message_id'] = button_message.message_id
     except Exception:
         button_message = await context.bot.send_message(
             chat_id=chat_id,
-            text="📊 Pilih timeframe untuk analisa lagi:",
-            reply_markup=get_timeframe_keyboard()
+            text="📊 Lanjutkan analisa:",
+            reply_markup=get_after_analysis_keyboard(symbol)
         )
         context.user_data['last_button_message_id'] = button_message.message_id
     
@@ -534,36 +673,51 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
 
 
 async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk command /analyze [timeframe]"""
+    """Handler untuk command /analyze [coin] [timeframe]"""
     args = context.args
     
-    if not args:
+    if len(args) < 2:
+        coins_list = ", ".join(SUPPORTED_COINS.keys())
         await update.message.reply_text(
-            "Penggunaan: /analyze <timeframe>\n"
-            "Contoh: /analyze 15min\n\n"
-            "Timeframe tersedia: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day"
+            f"Penggunaan: /analyze <coin> <timeframe>\n"
+            f"Contoh: /analyze BTC 15min\n"
+            f"        /analyze ETH 4hour\n\n"
+            f"Coins tersedia: {coins_list}\n\n"
+            f"Timeframe tersedia: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day, 1week"
         )
         return
     
-    interval = args[0].lower()
+    symbol = args[0].upper()
+    interval = args[1].lower()
+    
+    if symbol not in SUPPORTED_COINS:
+        coins_list = ", ".join(SUPPORTED_COINS.keys())
+        await update.message.reply_text(
+            f"❌ Coin tidak valid: {symbol}\n"
+            f"Gunakan salah satu: {coins_list}"
+        )
+        return
+    
     if interval not in INTERVAL_MAP:
         await update.message.reply_text(
             f"❌ Timeframe tidak valid: {interval}\n"
-            "Gunakan: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day"
+            f"Gunakan: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day, 1week"
         )
         return
     
-    await update.message.reply_text(f"⏳ Mengambil data BTC/USDT ({interval})...")
+    coin_info = SUPPORTED_COINS.get(symbol, {"emoji": "📊"})
     
-    data = fetch_btc_kucoin(interval)
+    await update.message.reply_text(f"⏳ Mengambil data {coin_info['emoji']} {symbol}/USDT ({interval})...")
+    
+    data = fetch_crypto_kucoin(symbol, interval)
     if not data or len(data) < 20:
         await update.message.reply_text("❌ Gagal mengambil data atau data terlalu sedikit.")
         return
     
     await update.message.reply_text("📊 Generating chart...")
     
-    filename = f"chart_{interval}_{int(datetime.now().timestamp())}.png"
-    chart_path = generate_candlestick_chart(data, filename, interval)
+    filename = f"chart_{symbol}_{interval}_{int(datetime.now().timestamp())}.png"
+    chart_path = generate_candlestick_chart(data, filename, symbol, interval)
     
     if not chart_path:
         await update.message.reply_text("❌ Gagal membuat chart.")
@@ -572,15 +726,16 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with open(chart_path, "rb") as photo:
         await update.message.reply_photo(
             photo=photo,
-            caption=f"📊 BTC/USDT ({interval})\n⏳ Menganalisa..."
+            caption=f"{coin_info['emoji']} {symbol}/USDT ({interval})\n⏳ Menganalisa..."
         )
     
-    analysis = analyze_image_with_gemini(chart_path)
+    analysis = analyze_image_with_gemini(chart_path, symbol)
     formatted = format_analysis_reply(analysis)
     
     await update.message.reply_text(
-        f"📈 Hasil Analisa BTC/USDT ({interval}):\n\n{formatted}\n\n"
-        "⚠️ Disclaimer: Bukan financial advice."
+        f"{coin_info['emoji']} Hasil Analisa {symbol}/USDT ({interval}):\n\n{formatted}\n\n"
+        "⚠️ Disclaimer: Bukan financial advice.",
+        reply_markup=get_after_analysis_keyboard(symbol)
     )
     
     try:
@@ -589,24 +744,53 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
 
+async def cmd_coins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /coins - menampilkan daftar coin"""
+    coins_text = "📊 *Daftar Cryptocurrency yang Didukung:*\n\n"
+    
+    for symbol, info in SUPPORTED_COINS.items():
+        price = get_current_price(symbol)
+        price_str = f"${price:,.2f}" if price else "N/A"
+        coins_text += f"{info['emoji']} *{symbol}* - {info['name']}\n   └ Harga: {price_str}\n\n"
+    
+    coins_text += "_Gunakan /start untuk memilih coin dan timeframe_"
+    
+    await update.message.reply_text(
+        coins_text,
+        parse_mode='Markdown',
+        reply_markup=get_coin_keyboard()
+    )
+
+
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /help"""
-    help_text = """📖 *Panduan Penggunaan Bot*
+    coins_list = ", ".join(SUPPORTED_COINS.keys())
+    help_text = f"""📖 *Panduan Penggunaan Bot*
 
 *Commands:*
-/start - Pilih timeframe dengan tombol
-/analyze <tf> - Analisa langsung (misal: /analyze 15min)
+/start - Pilih coin dan timeframe dengan tombol
+/analyze <coin> <tf> - Analisa langsung
+/coins - Lihat daftar coin dan harga
 /help - Tampilkan bantuan ini
 
+*Contoh:*
+/analyze BTC 15min
+/analyze ETH 4hour
+/analyze SOL 1day
+
+*Coins tersedia ({len(SUPPORTED_COINS)}):*
+{coins_list}
+
 *Timeframe tersedia:*
-1min, 5min, 15min, 30min, 1hour, 4hour, 1day
+1min, 5min, 15min, 30min, 1hour, 4hour, 1day, 1week
 
 *Fitur:*
-- Chart candlestick dengan EMA20 & EMA50
-- Analisa AI menggunakan Gemini Vision
-- Sinyal BUY/SELL/HOLD
-- Entry, TP, dan SL recommendation
-- Pattern recognition
+• Chart candlestick dengan EMA20 & EMA50
+• Analisa AI menggunakan Gemini Vision
+• Sinyal BUY/SELL/HOLD
+• Entry, TP, dan SL recommendation
+• Pattern recognition
+• Multi-coin support
 
 ⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""
     
@@ -633,26 +817,28 @@ def main():
         print("Analisa AI tidak akan berfungsi tanpa API key.")
         print("Set environment variable: export GEMINI_API_KEY='your_key'")
     
-    print("🚀 Starting BTC/USDT Analysis Bot...")
+    print("🚀 Starting Multi-Coin Analysis Bot (Advanced Version)...")
     print(f"📊 Telegram Token: {TELEGRAM_BOT_TOKEN[:10]}...")
     print(f"🤖 Gemini API: {'Configured' if GEMINI_API_KEY else 'Not configured'}")
+    print(f"💰 Supported coins: {', '.join(SUPPORTED_COINS.keys())}")
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("analyze", cmd_analyze))
+    app.add_handler(CommandHandler("coins", cmd_coins))
     app.add_handler(CommandHandler("help", cmd_help))
-    app.add_handler(CallbackQueryHandler(handle_timeframe_callback))
+    
+    app.add_handler(CallbackQueryHandler(handle_coin_callback, pattern=r'^coin_'))
+    app.add_handler(CallbackQueryHandler(handle_back_to_coins, pattern=r'^back_to_coins$'))
+    app.add_handler(CallbackQueryHandler(handle_timeframe_callback, pattern=r'^tf_'))
+    
     app.add_error_handler(error_handler)
     
-    print("✅ Bot aktif! Kirim /start ke bot Telegram Anda.")
-    print("Press Ctrl+C to stop.")
-    print("⚠️ Pastikan tidak ada instance bot lain yang berjalan dengan token yang sama!")
+    print("✅ Bot siap menerima pesan!")
+    print(f"🔗 Supported coins: {len(SUPPORTED_COINS)}")
     
-    app.run_polling(
-        allowed_updates=Update.ALL_TYPES,
-        drop_pending_updates=True
-    )
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
