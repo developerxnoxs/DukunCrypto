@@ -63,8 +63,11 @@ def fetch_xauusd_data(interval="1hour"):
         # Download data using yfinance
         ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
         
-        # Use longer period for stable data fetch
-        period = "3mo"
+        # Determine period based on interval - use less data for intraday to avoid weekend gaps
+        if interval in ["1min", "5min", "15min", "30min"]:
+            period = "3d"  # Changed from 5d to 3d to avoid weekend data
+        else:
+            period = "1y"
         
         df = ticker.history(period=period, interval=yf_interval)
         
@@ -77,6 +80,15 @@ def fetch_xauusd_data(interval="1hour"):
         if df.empty:
             logger.warning("Semua data XAUUSD adalah NaN")
             return None
+        
+        # For intraday, remove outlier volumes (likely flash trades/gaps)
+        if interval in ["1min", "5min", "15min", "30min"]:
+            volume_q75 = df['Volume'].quantile(0.75)
+            volume_q25 = df['Volume'].quantile(0.25)
+            iqr = volume_q75 - volume_q25
+            upper_bound = volume_q75 + (1.5 * iqr)
+            # Cap extreme volume spikes
+            df['Volume'] = df['Volume'].clip(upper=upper_bound)
         
         # Convert to candlestick format (list of arrays like btc_analyzer)
         candles = []
@@ -598,7 +610,7 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "❌ Gagal mengambil harga gold. Coba lagi nanti."
+            "❌ Gagal mengambil harga gold. Pastikan FINNHUB_API_KEY sudah di-set."
         )
 
 
@@ -622,7 +634,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Entry, TP, dan SL recommendation
 
 *API yang digunakan:*
-• Yahoo Finance - XAUUSD historical candlestick data
+• Finnhub - XAUUSD historical candlestick data
 • Google Gemini Vision - AI Analysis
 
 ⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""

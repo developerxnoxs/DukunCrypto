@@ -55,7 +55,7 @@ INTERVAL_MAP = {
 
 
 def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
-    """Mengambil data candlestick dari KuCoin API untuk berbagai coin - today's data only"""
+    """Mengambil data candlestick dari KuCoin API untuk berbagai coin"""
     pair = f"{symbol}-USDT"
     
     if interval not in INTERVAL_MAP:
@@ -63,8 +63,7 @@ def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
         return None
     
     end_at = int(datetime.now(timezone.utc).timestamp())
-    # Use only 24 hours of data for optimal chart and Gemini analysis
-    start_at = end_at - (24 * 3600)
+    start_at = end_at - INTERVAL_MAP[interval] * candle_limit
 
     try:
         logger.info(f"Mengambil data {pair} interval {interval}...")
