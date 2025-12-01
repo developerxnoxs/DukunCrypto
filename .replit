@@ -21,7 +21,7 @@ args = "BTC Analyzer Bot"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "XAU Analyzer Bot"
+args = "Forex Analyzer Bot"
 
 [[workflows.workflow]]
 name = "BTC Analyzer Bot"
@@ -35,12 +35,12 @@ task = "shell.exec"
 args = "uv run python btc_analyzer.py"
 
 [[workflows.workflow]]
-name = "XAU Analyzer Bot"
+name = "Forex Analyzer Bot"
 author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "uv run python xau_analyzer.py"
+
+[workflows.workflow.metadata]
+outputType = "console"

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-XAUUSD (Gold) Technical Analysis Bot
-Tool CLI untuk analisa teknikal Gold/XAUUSD menggunakan Telegram Bot dan Gemini AI Vision
-Menggunakan TradingView untuk data historical gold (untuk pembelajaran)
+Forex & Commodities Technical Analysis Bot
+Tool CLI untuk analisa teknikal Forex dan Komoditas menggunakan Telegram Bot dan Gemini AI Vision
+Menggunakan TradingView untuk data historical (untuk pembelajaran)
 """
 
 import logging
@@ -41,6 +41,25 @@ logger = logging.getLogger(__name__)
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN_XAU", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
+FOREX_PAIRS = {
+    "XAUUSD": {"name": "Gold", "emoji": "🥇", "yf_symbol": "GC=F", "category": "commodity"},
+    "XAGUSD": {"name": "Silver", "emoji": "🥈", "yf_symbol": "SI=F", "category": "commodity"},
+    "EURUSD": {"name": "EUR/USD", "emoji": "💶", "yf_symbol": "EURUSD=X", "category": "major"},
+    "GBPUSD": {"name": "GBP/USD", "emoji": "💷", "yf_symbol": "GBPUSD=X", "category": "major"},
+    "USDJPY": {"name": "USD/JPY", "emoji": "💴", "yf_symbol": "USDJPY=X", "category": "major"},
+    "USDCHF": {"name": "USD/CHF", "emoji": "🇨🇭", "yf_symbol": "USDCHF=X", "category": "major"},
+    "AUDUSD": {"name": "AUD/USD", "emoji": "🇦🇺", "yf_symbol": "AUDUSD=X", "category": "major"},
+    "USDCAD": {"name": "USD/CAD", "emoji": "🇨🇦", "yf_symbol": "USDCAD=X", "category": "major"},
+    "NZDUSD": {"name": "NZD/USD", "emoji": "🇳🇿", "yf_symbol": "NZDUSD=X", "category": "major"},
+    "EURGBP": {"name": "EUR/GBP", "emoji": "🇪🇺", "yf_symbol": "EURGBP=X", "category": "cross"},
+    "EURJPY": {"name": "EUR/JPY", "emoji": "🇪🇺", "yf_symbol": "EURJPY=X", "category": "cross"},
+    "GBPJPY": {"name": "GBP/JPY", "emoji": "🇬🇧", "yf_symbol": "GBPJPY=X", "category": "cross"},
+    "AUDJPY": {"name": "AUD/JPY", "emoji": "🇦🇺", "yf_symbol": "AUDJPY=X", "category": "cross"},
+    "EURAUD": {"name": "EUR/AUD", "emoji": "🇪🇺", "yf_symbol": "EURAUD=X", "category": "cross"},
+    "EURCHF": {"name": "EUR/CHF", "emoji": "🇪🇺", "yf_symbol": "EURCHF=X", "category": "cross"},
+    "USOIL": {"name": "Crude Oil", "emoji": "🛢️", "yf_symbol": "CL=F", "category": "commodity"},
+}
+
 INTERVAL_MAP = {
     "1min": "1m",
     "5min": "5m",
@@ -62,8 +81,8 @@ TV_INTERVAL_MAP = {
 }
 
 
-def fetch_xauusd_from_tradingview(interval="1hour", n_bars=200):
-    """Mengambil data candlestick XAUUSD dari TradingView (untuk pembelajaran)"""
+def fetch_forex_from_tradingview(symbol="XAUUSD", interval="1hour", n_bars=200):
+    """Mengambil data candlestick Forex dari TradingView (untuk pembelajaran)"""
     
     if not TV_AVAILABLE:
         logger.error("tvDatafeed library tidak tersedia")
@@ -73,16 +92,20 @@ def fetch_xauusd_from_tradingview(interval="1hour", n_bars=200):
         logger.error(f"Interval tidak valid: {interval}")
         return None
     
+    if symbol not in FOREX_PAIRS:
+        logger.error(f"Symbol tidak valid: {symbol}")
+        return None
+    
     tv_interval = TV_INTERVAL_MAP[interval]
     
     exchanges = ['OANDA', 'FXCM', 'FX_IDC', 'FOREXCOM', 'CAPITALCOM']
     
     for exchange in exchanges:
         try:
-            logger.info(f"Mencoba mengambil data XAUUSD dari TradingView ({exchange}) interval {interval}...")
+            logger.info(f"Mencoba mengambil data {symbol} dari TradingView ({exchange}) interval {interval}...")
             
             df = tv.get_hist(
-                symbol='XAUUSD',
+                symbol=symbol,
                 exchange=exchange,
                 interval=tv_interval,
                 n_bars=n_bars
@@ -104,19 +127,19 @@ def fetch_xauusd_from_tradingview(interval="1hour", n_bars=200):
                         float(row["volume"]) if "volume" in row else 0
                     ])
                 
-                logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD dari TradingView ({exchange})")
+                logger.info(f"Berhasil mengambil {len(candles)} candle {symbol} dari TradingView ({exchange})")
                 return candles
                 
         except Exception as e:
             logger.warning(f"Gagal dari {exchange}: {e}")
             continue
     
-    logger.error("Gagal mengambil data dari semua exchange TradingView")
+    logger.error(f"Gagal mengambil data {symbol} dari semua exchange TradingView")
     return None
 
 
-def fetch_xauusd_from_yfinance(interval="1hour"):
-    """Mengambil data candlestick XAUUSD dari Yahoo Finance (fallback)"""
+def fetch_forex_from_yfinance(symbol="XAUUSD", interval="1hour"):
+    """Mengambil data candlestick Forex dari Yahoo Finance (fallback)"""
     
     if not yf:
         logger.error("yfinance library tidak tersedia")
@@ -125,12 +148,17 @@ def fetch_xauusd_from_yfinance(interval="1hour"):
     if interval not in INTERVAL_MAP:
         logger.error(f"Interval tidak valid: {interval}")
         return None
+    
+    if symbol not in FOREX_PAIRS:
+        logger.error(f"Symbol tidak valid: {symbol}")
+        return None
 
     try:
-        logger.info(f"Mengambil data XAUUSD dari Yahoo Finance interval {interval}...")
+        yf_symbol = FOREX_PAIRS[symbol]["yf_symbol"]
+        logger.info(f"Mengambil data {symbol} dari Yahoo Finance ({yf_symbol}) interval {interval}...")
         
         yf_interval = INTERVAL_MAP[interval]
-        ticker = yf.Ticker("GC=F")
+        ticker = yf.Ticker(yf_symbol)
         
         if interval in ["1min", "5min", "15min", "30min"]:
             period = "3d"
@@ -140,71 +168,80 @@ def fetch_xauusd_from_yfinance(interval="1hour"):
         df = ticker.history(period=period, interval=yf_interval)
         
         if df.empty:
-            logger.warning("Tidak ada data XAUUSD dari Yahoo Finance")
+            logger.warning(f"Tidak ada data {symbol} dari Yahoo Finance")
             return None
         
         df = df.dropna()
         if df.empty:
-            logger.warning("Semua data XAUUSD adalah NaN")
+            logger.warning(f"Semua data {symbol} adalah NaN")
             return None
         
         if interval in ["1min", "5min", "15min", "30min"]:
-            volume_q75 = df['Volume'].quantile(0.75)
-            volume_q25 = df['Volume'].quantile(0.25)
-            iqr = volume_q75 - volume_q25
-            upper_bound = volume_q75 + (1.5 * iqr)
-            df['Volume'] = df['Volume'].clip(upper=upper_bound)
+            if 'Volume' in df.columns and df['Volume'].sum() > 0:
+                volume_q75 = df['Volume'].quantile(0.75)
+                volume_q25 = df['Volume'].quantile(0.25)
+                iqr = volume_q75 - volume_q25
+                upper_bound = volume_q75 + (1.5 * iqr)
+                df['Volume'] = df['Volume'].clip(upper=upper_bound)
         
         candles = []
         for timestamp, row in df.iterrows():
+            volume = float(row["Volume"]) if "Volume" in row and pd.notna(row["Volume"]) else 0
             candles.append([
                 int(timestamp.timestamp()),
                 float(row["Open"]),
                 float(row["Close"]),
                 float(row["High"]),
                 float(row["Low"]),
-                float(row["Volume"])
+                volume
             ])
         
-        logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD dari Yahoo Finance")
+        logger.info(f"Berhasil mengambil {len(candles)} candle {symbol} dari Yahoo Finance")
         return candles[-200:] if len(candles) > 200 else candles
         
     except Exception as e:
-        logger.error(f"Error mengambil data XAUUSD dari Yahoo Finance: {e}")
+        logger.error(f"Error mengambil data {symbol} dari Yahoo Finance: {e}")
         return None
 
 
-def fetch_xauusd_data(interval="1hour"):
-    """Mengambil data candlestick XAUUSD - prioritas TradingView, fallback ke Yahoo Finance"""
+def fetch_forex_data(symbol="XAUUSD", interval="1hour"):
+    """Mengambil data candlestick Forex - prioritas TradingView, fallback ke Yahoo Finance"""
     
     if interval not in INTERVAL_MAP:
         logger.error(f"Interval tidak valid: {interval}")
         return None
     
-    data = fetch_xauusd_from_tradingview(interval)
+    if symbol not in FOREX_PAIRS:
+        logger.error(f"Symbol tidak valid: {symbol}")
+        return None
+    
+    data = fetch_forex_from_tradingview(symbol, interval)
     
     if data and len(data) >= 20:
-        logger.info("Data berhasil diambil dari TradingView")
+        logger.info(f"Data {symbol} berhasil diambil dari TradingView")
         return data
     
     logger.info("Fallback ke Yahoo Finance...")
-    data = fetch_xauusd_from_yfinance(interval)
+    data = fetch_forex_from_yfinance(symbol, interval)
     
     if data and len(data) >= 20:
-        logger.info("Data berhasil diambil dari Yahoo Finance")
+        logger.info(f"Data {symbol} berhasil diambil dari Yahoo Finance")
         return data
     
-    logger.error("Gagal mengambil data dari semua sumber")
+    logger.error(f"Gagal mengambil data {symbol} dari semua sumber")
     return None
 
 
-def get_current_gold_price():
-    """Mengambil harga gold terkini"""
+def get_current_price(symbol="XAUUSD"):
+    """Mengambil harga terkini untuk symbol tertentu"""
+    
+    if symbol not in FOREX_PAIRS:
+        return None
     
     if TV_AVAILABLE:
         try:
             df = tv.get_hist(
-                symbol='XAUUSD',
+                symbol=symbol,
                 exchange='OANDA',
                 interval=Interval.in_1_minute,
                 n_bars=1
@@ -212,22 +249,23 @@ def get_current_gold_price():
             if df is not None and not df.empty:
                 return float(df.iloc[-1]["close"])
         except Exception as e:
-            logger.warning(f"Error getting price from TradingView: {e}")
+            logger.warning(f"Error getting {symbol} price from TradingView: {e}")
     
     if yf:
         try:
-            ticker = yf.Ticker("GC=F")
+            yf_symbol = FOREX_PAIRS[symbol]["yf_symbol"]
+            ticker = yf.Ticker(yf_symbol)
             data = ticker.history(period="1d", interval="1m")
             if not data.empty:
                 return float(data.iloc[-1]["Close"])
         except Exception as e:
-            logger.error(f"Error getting gold price from Yahoo: {e}")
+            logger.error(f"Error getting {symbol} price from Yahoo: {e}")
     
     return None
 
 
-def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
-    """Generate chart candlestick XAUUSD dari data OHLCV"""
+def generate_forex_chart(data, symbol="XAUUSD", filename="forex_chart.png", tf="1hour"):
+    """Generate chart candlestick Forex dari data OHLCV"""
     if not data:
         logger.error("Data kosong, tidak bisa generate chart")
         return None
@@ -269,10 +307,13 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
             mpf.make_addplot(ema50, color='orange', width=1, label='EMA50')
         ]
 
+        pair_info = FOREX_PAIRS.get(symbol, {"name": symbol, "emoji": "📊"})
+        chart_title = f"\n{symbol} - {pair_info['name']} ({tf})"
+        
         mpf.plot(
             df, type='candle', volume=True, style=style,
-            title=f"\nXAUUSD - Gold ({tf})",
-            ylabel="Price (USD)",
+            title=chart_title,
+            ylabel="Price",
             ylabel_lower="Volume",
             savefig=dict(fname=filename, dpi=150, bbox_inches='tight'),
             figratio=(16, 9),
@@ -282,7 +323,7 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
             warn_too_much_data=500
         )
         
-        logger.info(f"Chart XAUUSD berhasil disimpan: {filename}")
+        logger.info(f"Chart {symbol} berhasil disimpan: {filename}")
         return filename
         
     except Exception as e:
@@ -292,8 +333,8 @@ def generate_xauusd_chart(data, filename="xau_chart.png", tf="1hour"):
         return None
 
 
-def analyze_xauusd_with_gemini(image_path):
-    """Analisa chart XAUUSD menggunakan Gemini Vision API"""
+def analyze_forex_with_gemini(image_path, symbol="XAUUSD"):
+    """Analisa chart Forex menggunakan Gemini Vision API"""
     if not GEMINI_API_KEY:
         return "GEMINI_API_KEY tidak ditemukan. Set environment variable terlebih dahulu."
     
@@ -304,8 +345,11 @@ def analyze_xauusd_with_gemini(image_path):
         return f"File tidak ditemukan: {image_path}"
     except Exception as e:
         return f"Error membaca file: {e}"
+    
+    pair_info = FOREX_PAIRS.get(symbol, {"name": symbol})
+    pair_name = pair_info["name"]
 
-    prompt = """Analisa chart candlestick XAUUSD (Gold/Emas vs USD) ini secara teknikal. Berikan analisa dalam format berikut:
+    prompt = f"""Analisa chart candlestick {symbol} ({pair_name}) ini secara teknikal. Berikan analisa dalam format berikut:
 
 SINYAL: [BUY/SELL/HOLD] - [Alasan singkat]
 ENTRY: [Harga entry yang disarankan dalam USD]
@@ -315,9 +359,9 @@ POLA: [Pola candlestick yang terlihat, misalnya: Bullish Engulfing, Doji, Hammer
 TREND: [Trend saat ini: Uptrend/Downtrend/Sideways]
 SUPPORT: [Level support terdekat]
 RESISTANCE: [Level resistance terdekat]
-KESIMPULAN: [Ringkasan analisa dalam 1-2 kalimat untuk trading Gold/XAUUSD]
+KESIMPULAN: [Ringkasan analisa dalam 1-2 kalimat untuk trading {symbol}]
 
-Berikan angka spesifik berdasarkan chart yang terlihat. Perhatikan bahwa ini adalah chart Gold (XAUUSD) dengan harga dalam USD per troy ounce."""
+Berikan angka spesifik berdasarkan chart yang terlihat."""
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     
@@ -339,7 +383,7 @@ Berikan angka spesifik berdasarkan chart yang terlihat. Perhatikan bahwa ini ada
     headers = {"Content-Type": "application/json"}
     
     try:
-        logger.info("Mengirim chart XAUUSD ke Gemini untuk analisa...")
+        logger.info(f"Mengirim chart {symbol} ke Gemini untuk analisa...")
         response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=60)
         
         if response.status_code == 200:
@@ -350,7 +394,7 @@ Berikan angka spesifik berdasarkan chart yang terlihat. Perhatikan bahwa ini ada
                 if "content" in candidate and "parts" in candidate["content"]:
                     text = candidate["content"]["parts"][0].get("text", "")
                     if text:
-                        logger.info("Analisa Gemini XAUUSD berhasil")
+                        logger.info(f"Analisa Gemini {symbol} berhasil")
                         return text
             
             return "Format respons Gemini tidak sesuai. Coba lagi."
@@ -455,45 +499,125 @@ def format_analysis_reply(text):
     return '\n'.join(result_parts) if result_parts else text
 
 
-def get_timeframe_keyboard():
-    """Generate keyboard untuk pilihan timeframe XAUUSD"""
+def get_symbol_keyboard():
+    """Generate keyboard untuk pilihan symbol Forex"""
+    commodities = [s for s, info in FOREX_PAIRS.items() if info["category"] == "commodity"]
+    majors = [s for s, info in FOREX_PAIRS.items() if info["category"] == "major"]
+    crosses = [s for s, info in FOREX_PAIRS.items() if info["category"] == "cross"]
+    
+    buttons = []
+    
+    buttons.append([InlineKeyboardButton("─── Komoditas ───", callback_data='ignore')])
+    row = []
+    for symbol in commodities:
+        info = FOREX_PAIRS[symbol]
+        row.append(InlineKeyboardButton(f"{info['emoji']} {symbol}", callback_data=f'sym_{symbol}'))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    
+    buttons.append([InlineKeyboardButton("─── Major Pairs ───", callback_data='ignore')])
+    row = []
+    for symbol in majors:
+        info = FOREX_PAIRS[symbol]
+        row.append(InlineKeyboardButton(f"{info['emoji']} {symbol}", callback_data=f'sym_{symbol}'))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    
+    buttons.append([InlineKeyboardButton("─── Cross Pairs ───", callback_data='ignore')])
+    row = []
+    for symbol in crosses:
+        info = FOREX_PAIRS[symbol]
+        row.append(InlineKeyboardButton(f"{info['emoji']} {symbol}", callback_data=f'sym_{symbol}'))
+        if len(row) == 3:
+            buttons.append(row)
+            row = []
+    if row:
+        buttons.append(row)
+    
+    return InlineKeyboardMarkup(buttons)
+
+
+def get_timeframe_keyboard(symbol="XAUUSD"):
+    """Generate keyboard untuk pilihan timeframe"""
+    info = FOREX_PAIRS.get(symbol, {"emoji": "📊"})
+    emoji = info["emoji"]
+    
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("1m", callback_data='xau_1min'),
-            InlineKeyboardButton("5m", callback_data='xau_5min'),
-            InlineKeyboardButton("15m", callback_data='xau_15min'),
-            InlineKeyboardButton("30m", callback_data='xau_30min'),
+            InlineKeyboardButton("1m", callback_data=f'tf_{symbol}_1min'),
+            InlineKeyboardButton("5m", callback_data=f'tf_{symbol}_5min'),
+            InlineKeyboardButton("15m", callback_data=f'tf_{symbol}_15min'),
+            InlineKeyboardButton("30m", callback_data=f'tf_{symbol}_30min'),
         ],
         [
-            InlineKeyboardButton("1h", callback_data='xau_1hour'),
-            InlineKeyboardButton("4h", callback_data='xau_4hour'),
-            InlineKeyboardButton("1d", callback_data='xau_1day'),
+            InlineKeyboardButton("1h", callback_data=f'tf_{symbol}_1hour'),
+            InlineKeyboardButton("4h", callback_data=f'tf_{symbol}_4hour'),
+            InlineKeyboardButton("1d", callback_data=f'tf_{symbol}_1day'),
+        ],
+        [
+            InlineKeyboardButton("⬅️ Kembali ke daftar pair", callback_data='back_to_symbols'),
         ],
     ])
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /start"""
-    current_price = get_current_gold_price()
-    price_text = f"💵 Harga saat ini: ${current_price:,.2f}/oz" if current_price else ""
-    
-    welcome_text = f"""🥇 *XAUUSD (Gold) Technical Analysis Bot*
+    welcome_text = """📊 *Forex & Commodities Technical Analysis Bot*
 ━━━━━━━━━━━━━━━━━━━━
 
-{price_text}
-
 *Fitur:*
-• Chart candlestick real-time
+• 16 pasangan Forex & Komoditas
+• Chart candlestick real-time (TradingView)
 • EMA20 & EMA50 indicators
 • Analisa AI dengan Gemini Vision
 • Multiple timeframe (1m - 1d)
 
 ━━━━━━━━━━━━━━━━━━━━
-*Pilih timeframe untuk analisa XAUUSD:*"""
+*Pilih pair untuk analisa:*"""
     
     await update.message.reply_text(
         welcome_text,
-        reply_markup=get_timeframe_keyboard(),
+        reply_markup=get_symbol_keyboard(),
+        parse_mode='Markdown'
+    )
+
+
+async def handle_symbol_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk callback button symbol selection"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == 'ignore':
+        return
+    
+    if query.data == 'back_to_symbols':
+        await query.edit_message_text(
+            "📊 *Pilih pair untuk analisa:*",
+            reply_markup=get_symbol_keyboard(),
+            parse_mode='Markdown'
+        )
+        return
+    
+    symbol = query.data.replace('sym_', '')
+    
+    if symbol not in FOREX_PAIRS:
+        return
+    
+    info = FOREX_PAIRS[symbol]
+    context.user_data['selected_symbol'] = symbol
+    
+    current_price = get_current_price(symbol)
+    price_text = f"💵 Harga saat ini: {current_price:.5f}" if current_price else ""
+    
+    await query.edit_message_text(
+        f"{info['emoji']} *{symbol} - {info['name']}*\n{price_text}\n\n*Pilih timeframe:*",
+        reply_markup=get_timeframe_keyboard(symbol),
         parse_mode='Markdown'
     )
 
@@ -503,7 +627,17 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     query = update.callback_query
     await query.answer()
     
-    interval = query.data.replace('xau_', '')
+    parts = query.data.replace('tf_', '').rsplit('_', 1)
+    if len(parts) != 2:
+        return
+    
+    symbol = parts[0]
+    interval = parts[1]
+    
+    if symbol not in FOREX_PAIRS or interval not in INTERVAL_MAP:
+        return
+    
+    info = FOREX_PAIRS[symbol]
     chat_id = query.message.chat_id
     current_message_id = query.message.message_id
     
@@ -523,7 +657,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     
     status_message = await context.bot.send_message(
         chat_id=chat_id,
-        text=f"⏳ Mengambil data 🥇 XAUUSD ({interval})..."
+        text=f"⏳ Mengambil data {info['emoji']} {symbol} ({interval})..."
     )
     
     try:
@@ -531,14 +665,14 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     except:
         pass
     
-    data = fetch_xauusd_data(interval)
+    data = fetch_forex_data(symbol, interval)
     
     if not data:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal mengambil data XAUUSD. Coba lagi nanti.\n\n🥇 Pilih timeframe lain:",
-            reply_markup=get_timeframe_keyboard()
+            text=f"❌ Gagal mengambil data {symbol}. Coba lagi nanti.\n\n{info['emoji']} Pilih timeframe lain:",
+            reply_markup=get_timeframe_keyboard(symbol)
         )
         return
     
@@ -547,25 +681,25 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             chat_id=chat_id,
             message_id=status_message.message_id,
             text=f"❌ Data terlalu sedikit ({len(data)} candle). Coba timeframe lain.",
-            reply_markup=get_timeframe_keyboard()
+            reply_markup=get_timeframe_keyboard(symbol)
         )
         return
     
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=status_message.message_id,
-        text=f"📊 Generating chart 🥇 XAUUSD ({interval})..."
+        text=f"📊 Generating chart {info['emoji']} {symbol} ({interval})..."
     )
     
-    filename = f"xau_chart_{interval}_{int(datetime.now().timestamp())}.png"
-    chart_path = generate_xauusd_chart(data, filename, interval)
+    filename = f"forex_chart_{symbol}_{interval}_{int(datetime.now().timestamp())}.png"
+    chart_path = generate_forex_chart(data, symbol, filename, interval)
     
     if not chart_path:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal membuat chart.\n\n🥇 Pilih timeframe:",
-            reply_markup=get_timeframe_keyboard()
+            text=f"❌ Gagal membuat chart.\n\n{info['emoji']} Pilih timeframe:",
+            reply_markup=get_timeframe_keyboard(symbol)
         )
         return
     
@@ -574,7 +708,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             photo_message = await context.bot.send_photo(
                 chat_id=chat_id,
                 photo=photo,
-                caption=f"🥇 XAUUSD Chart ({interval})"
+                caption=f"{info['emoji']} {symbol} - {info['name']} ({interval})"
             )
             context.user_data['last_chart_message_id'] = photo_message.message_id
     except Exception as e:
@@ -582,20 +716,20 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
             chat_id=chat_id,
             message_id=status_message.message_id,
             text="❌ Gagal mengirim chart.",
-            reply_markup=get_timeframe_keyboard()
+            reply_markup=get_timeframe_keyboard(symbol)
         )
         return
     
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=status_message.message_id,
-        text=f"🤖 Menganalisa chart XAUUSD dengan AI..."
+        text=f"🤖 Menganalisa chart {symbol} dengan AI..."
     )
     
-    analysis = analyze_xauusd_with_gemini(chart_path)
+    analysis = analyze_forex_with_gemini(chart_path, symbol)
     formatted = format_analysis_reply(analysis)
     
-    result_text = f"""🥇 *Hasil Analisa XAUUSD ({interval})*
+    result_text = f"""{info['emoji']} *Hasil Analisa {symbol} ({interval})*
 ━━━━━━━━━━━━━━━━━━━━
 
 {formatted}
@@ -621,16 +755,16 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     try:
         button_message = await context.bot.send_message(
             chat_id=chat_id,
-            text="🥇 *Pilih timeframe untuk analisa lagi:*",
+            text=f"{info['emoji']} *Pilih timeframe untuk analisa lagi:*",
             parse_mode='Markdown',
-            reply_markup=get_timeframe_keyboard()
+            reply_markup=get_timeframe_keyboard(symbol)
         )
         context.user_data['last_button_message_id'] = button_message.message_id
     except:
         button_message = await context.bot.send_message(
             chat_id=chat_id,
-            text="🥇 Pilih timeframe untuk analisa lagi:",
-            reply_markup=get_timeframe_keyboard()
+            text=f"{info['emoji']} Pilih timeframe untuk analisa lagi:",
+            reply_markup=get_timeframe_keyboard(symbol)
         )
     
     try:
@@ -640,18 +774,29 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
 
 
 async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk command /analyze [timeframe]"""
+    """Handler untuk command /analyze [symbol] [timeframe]"""
     args = context.args
     
-    if not args:
+    if len(args) < 2:
+        symbols_list = ", ".join(FOREX_PAIRS.keys())
         await update.message.reply_text(
-            "Penggunaan: /analyze <timeframe>\n"
-            "Contoh: /analyze 1hour\n\n"
-            "Timeframe tersedia: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day"
+            f"Penggunaan: /analyze <symbol> <timeframe>\n"
+            f"Contoh: /analyze EURUSD 1hour\n\n"
+            f"Symbol tersedia: {symbols_list}\n"
+            f"Timeframe tersedia: 1min, 5min, 15min, 30min, 1hour, 4hour, 1day"
         )
         return
     
-    interval = args[0].lower()
+    symbol = args[0].upper()
+    interval = args[1].lower()
+    
+    if symbol not in FOREX_PAIRS:
+        await update.message.reply_text(
+            f"❌ Symbol tidak valid: {symbol}\n"
+            f"Symbol tersedia: {', '.join(FOREX_PAIRS.keys())}"
+        )
+        return
+    
     if interval not in INTERVAL_MAP:
         await update.message.reply_text(
             f"❌ Timeframe tidak valid: {interval}\n"
@@ -659,17 +804,18 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    await update.message.reply_text(f"⏳ Mengambil data 🥇 XAUUSD ({interval})...")
+    info = FOREX_PAIRS[symbol]
+    await update.message.reply_text(f"⏳ Mengambil data {info['emoji']} {symbol} ({interval})...")
     
-    data = fetch_xauusd_data(interval)
+    data = fetch_forex_data(symbol, interval)
     if not data or len(data) < 20:
-        await update.message.reply_text("❌ Gagal mengambil data XAUUSD. Coba lagi nanti.")
+        await update.message.reply_text(f"❌ Gagal mengambil data {symbol}. Coba lagi nanti.")
         return
     
     await update.message.reply_text("📊 Generating chart...")
     
-    filename = f"xau_chart_{interval}_{int(datetime.now().timestamp())}.png"
-    chart_path = generate_xauusd_chart(data, filename, interval)
+    filename = f"forex_chart_{symbol}_{interval}_{int(datetime.now().timestamp())}.png"
+    chart_path = generate_forex_chart(data, symbol, filename, interval)
     
     if not chart_path:
         await update.message.reply_text("❌ Gagal membuat chart.")
@@ -678,14 +824,14 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with open(chart_path, "rb") as photo:
         await update.message.reply_photo(
             photo=photo,
-            caption=f"🥇 XAUUSD ({interval})\n⏳ Menganalisa..."
+            caption=f"{info['emoji']} {symbol} ({interval})\n⏳ Menganalisa..."
         )
     
-    analysis = analyze_xauusd_with_gemini(chart_path)
+    analysis = analyze_forex_with_gemini(chart_path, symbol)
     formatted = format_analysis_reply(analysis)
     
     await update.message.reply_text(
-        f"🥇 Hasil Analisa XAUUSD ({interval}):\n\n{formatted}\n\n"
+        f"{info['emoji']} Hasil Analisa {symbol} ({interval}):\n\n{formatted}\n\n"
         "⚠️ Disclaimer: Bukan financial advice."
     )
     
@@ -696,34 +842,61 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handler untuk command /price"""
-    price = get_current_gold_price()
+    """Handler untuk command /price [symbol]"""
+    args = context.args
+    symbol = args[0].upper() if args else "XAUUSD"
+    
+    if symbol not in FOREX_PAIRS:
+        await update.message.reply_text(
+            f"❌ Symbol tidak valid: {symbol}\n"
+            f"Symbol tersedia: {', '.join(FOREX_PAIRS.keys())}"
+        )
+        return
+    
+    info = FOREX_PAIRS[symbol]
+    price = get_current_price(symbol)
     
     if price:
+        if info["category"] == "commodity":
+            price_str = f"${price:,.2f}"
+        else:
+            price_str = f"{price:.5f}"
+        
         await update.message.reply_text(
-            f"🥇 *Harga Gold (XAUUSD) Saat Ini*\n\n"
-            f"💵 *${price:,.2f}* per troy ounce",
+            f"{info['emoji']} *Harga {symbol} ({info['name']}) Saat Ini*\n\n"
+            f"💵 *{price_str}*",
             parse_mode='Markdown',
-            reply_markup=get_timeframe_keyboard()
+            reply_markup=get_timeframe_keyboard(symbol)
         )
     else:
         await update.message.reply_text(
-            "❌ Gagal mengambil harga gold. Coba lagi nanti."
+            f"❌ Gagal mengambil harga {symbol}. Coba lagi nanti."
         )
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /help"""
-    help_text = """📖 *Panduan Penggunaan Bot XAUUSD*
+    symbols_commodities = [f"{info['emoji']} {s}" for s, info in FOREX_PAIRS.items() if info["category"] == "commodity"]
+    symbols_major = [f"{info['emoji']} {s}" for s, info in FOREX_PAIRS.items() if info["category"] == "major"]
+    symbols_cross = [f"{info['emoji']} {s}" for s, info in FOREX_PAIRS.items() if info["category"] == "cross"]
+    
+    help_text = f"""📖 *Panduan Penggunaan Forex Analysis Bot*
 
 *Commands:*
-/start - Pilih timeframe dengan tombol
-/analyze <tf> - Analisa langsung (misal: /analyze 1hour)
-/price - Lihat harga gold terkini
+/start - Pilih pair dan timeframe dengan tombol
+/analyze <symbol> <tf> - Analisa langsung
+/price <symbol> - Lihat harga terkini
 /help - Tampilkan bantuan ini
 
-*Timeframe tersedia:*
-1min, 5min, 15min, 30min, 1hour, 4hour, 1day
+*Contoh:*
+/analyze EURUSD 1hour
+/price XAUUSD
+
+*Komoditas:* {', '.join(symbols_commodities)}
+*Major Pairs:* {', '.join(symbols_major)}
+*Cross Pairs:* {', '.join(symbols_cross)}
+
+*Timeframe:* 1min, 5min, 15min, 30min, 1hour, 4hour, 1day
 
 *Fitur:*
 • Chart candlestick dengan EMA20 & EMA50
@@ -732,7 +905,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Entry, TP, dan SL recommendation
 
 *Data Source:*
-• TradingView - XAUUSD historical candlestick data (pembelajaran)
+• TradingView - Historical candlestick data
 • Yahoo Finance - Fallback data source
 • Google Gemini Vision - AI Analysis
 
@@ -751,7 +924,7 @@ def main():
     if not TELEGRAM_BOT_TOKEN:
         print("❌ Error: TELEGRAM_BOT_TOKEN_XAU tidak ditemukan!")
         print("Set environment variable: export TELEGRAM_BOT_TOKEN_XAU='your_token'")
-        print("Buat bot baru di @BotFather untuk XAUUSD analyzer")
+        print("Buat bot baru di @BotFather untuk Forex analyzer")
         sys.exit(1)
     
     if not GEMINI_API_KEY:
@@ -759,9 +932,10 @@ def main():
         print("Analisa AI tidak akan berfungsi tanpa API key.")
         print("Set environment variable: export GEMINI_API_KEY='your_key'")
     
-    print("🥇 Starting XAUUSD (Gold) Analysis Bot...")
+    print("📊 Starting Forex & Commodities Analysis Bot...")
     print(f"📊 Telegram Token: {TELEGRAM_BOT_TOKEN[:10]}...")
-    print(f"📊 Data Source: TradingView (XAUUSD) + Yahoo Finance fallback")
+    print(f"📊 Supported Pairs: {len(FOREX_PAIRS)} symbols")
+    print(f"📊 Data Source: TradingView + Yahoo Finance fallback")
     print(f"📊 TradingView: {'Available' if TV_AVAILABLE else 'Not available'}")
     print(f"🤖 Gemini API: {'Configured' if GEMINI_API_KEY else 'Not configured'}")
     
@@ -771,10 +945,11 @@ def main():
     app.add_handler(CommandHandler("analyze", cmd_analyze))
     app.add_handler(CommandHandler("price", cmd_price))
     app.add_handler(CommandHandler("help", cmd_help))
-    app.add_handler(CallbackQueryHandler(handle_timeframe_callback, pattern=r'^xau_'))
+    app.add_handler(CallbackQueryHandler(handle_symbol_callback, pattern=r'^(sym_|ignore|back_to_symbols)'))
+    app.add_handler(CallbackQueryHandler(handle_timeframe_callback, pattern=r'^tf_'))
     app.add_error_handler(error_handler)
     
-    print("✅ Bot XAUUSD siap menerima pesan!")
+    print("✅ Bot Forex siap menerima pesan!")
     app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
