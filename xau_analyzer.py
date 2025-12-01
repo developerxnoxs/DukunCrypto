@@ -2,7 +2,7 @@
 """
 XAUUSD (Gold) Technical Analysis Bot
 Tool CLI untuk analisa teknikal Gold/XAUUSD menggunakan Telegram Bot dan Gemini AI Vision
-Menggunakan Yahoo Finance untuk data historical gold
+Menggunakan Finnhub API untuk data historical gold
 """
 
 import logging
@@ -14,7 +14,6 @@ import sys
 import requests
 import mplfinance as mpf
 import pandas as pd
-import time
 from datetime import datetime, timezone, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
@@ -22,10 +21,8 @@ from pytz import timezone as tz
 
 try:
     import yfinance as yf
-except ImportError as e:
+except ImportError:
     yf = None
-    print(f"Warning: yfinance import failed: {e}")
-    print("Install dengan: pip install yfinance")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,77 +55,53 @@ def fetch_xauusd_data(interval="1hour"):
         logger.error(f"Interval tidak valid: {interval}")
         return None
 
-    yf_interval = INTERVAL_MAP[interval]
-    
-    if interval in ["1min", "5min", "15min", "30min"]:
-        period = "5d"
-    else:
-        period = "1y"
-    
-    symbols = ["GC=F", "GLD", "IAU"]
-    df = None
-    
-    for symbol in symbols:
-        for attempt in range(3):
-            try:
-                logger.info(f"Mengambil data {symbol} (attempt {attempt+1}/3) interval {interval}...")
-                
-                df = yf.download(symbol, period=period, interval=yf_interval, progress=False)
-                
-                if df is not None and not df.empty:
-                    logger.info(f"Berhasil mendapat data dari {symbol}")
-                    break
-                else:
-                    logger.warning(f"Tidak ada data dari {symbol}, mencoba lagi...")
-                    if attempt < 2:
-                        time.sleep(3)
-            except Exception as e:
-                logger.warning(f"Attempt {attempt+1} - Gagal mengambil {symbol}: {e}")
-                if attempt < 2:
-                    wait_time = 5 + (attempt * 5)
-                    logger.info(f"Waiting {wait_time}s sebelum retry...")
-                    time.sleep(wait_time)
-                continue
-        
-        if df is not None and not df.empty:
-            break
-    
-    if df is None or df.empty:
-        logger.error("Semua symbol gagal, tidak ada data XAUUSD")
-        return None
-    
     try:
+        logger.info(f"Mengambil data XAUUSD interval {interval}...")
+        
+        yf_interval = INTERVAL_MAP[interval]
+        
+        # Download data using yfinance
+        ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
+        
+        # Determine period based on interval - use less data for intraday to avoid weekend gaps
+        if interval in ["1min", "5min", "15min", "30min"]:
+            period = "3d"  # Changed from 5d to 3d to avoid weekend data
+        else:
+            period = "1y"
+        
+        df = ticker.history(period=period, interval=yf_interval)
+        
+        if df.empty:
+            logger.warning("Tidak ada data XAUUSD dari Yahoo Finance")
+            return None
+        
+        # Drop NaN values
         df = df.dropna()
         if df.empty:
             logger.warning("Semua data XAUUSD adalah NaN")
             return None
         
+        # For intraday, remove outlier volumes (likely flash trades/gaps)
         if interval in ["1min", "5min", "15min", "30min"]:
-            if 'Volume' in df.columns and len(df) > 0:
-                volume_q75 = df['Volume'].quantile(0.75)
-                volume_q25 = df['Volume'].quantile(0.25)
-                iqr = volume_q75 - volume_q25
-                upper_bound = volume_q75 + (1.5 * iqr)
-                df['Volume'] = df['Volume'].clip(upper=upper_bound)
+            volume_q75 = df['Volume'].quantile(0.75)
+            volume_q25 = df['Volume'].quantile(0.25)
+            iqr = volume_q75 - volume_q25
+            upper_bound = volume_q75 + (1.5 * iqr)
+            # Cap extreme volume spikes
+            df['Volume'] = df['Volume'].clip(upper=upper_bound)
         
+        # Convert to candlestick format (list of arrays like btc_analyzer)
         candles = []
         for timestamp, row in df.iterrows():
-            try:
-                candles.append([
-                    int(timestamp.timestamp()),
-                    float(row["Open"]),
-                    float(row["Close"]),
-                    float(row["High"]),
-                    float(row["Low"]),
-                    float(row.get("Volume", 0))
-                ])
-            except:
-                continue
+            candles.append([
+                int(timestamp.timestamp()),
+                float(row["Open"]),
+                float(row["Close"]),
+                float(row["High"]),
+                float(row["Low"]),
+                float(row["Volume"])
+            ])
         
-        if len(candles) == 0:
-            logger.warning("Tidak ada candle yang valid")
-            return None
-            
         logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD")
         return candles[-200:] if len(candles) > 200 else candles
         
@@ -145,20 +118,13 @@ def get_current_gold_price():
     if not yf:
         return None
     
-    symbols = ["GC=F", "GLD", "IAU"]
-    
-    for symbol in symbols:
-        for attempt in range(3):
-            try:
-                df = yf.download(symbol, period="1d", interval="1m", progress=False)
-                if df is not None and not df.empty:
-                    return float(df.iloc[-1]["Close"])
-            except Exception as e:
-                logger.warning(f"Attempt {attempt+1} - Error getting price from {symbol}: {e}")
-                if attempt < 2:
-                    time.sleep(3)
-                continue
-    
+    try:
+        ticker = yf.Ticker("GC=F")
+        data = ticker.history(period="1d", interval="1m")
+        if not data.empty:
+            return float(data.iloc[-1]["Close"])
+    except Exception as e:
+        logger.error(f"Error getting gold price: {e}")
     return None
 
 
@@ -473,7 +439,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal mengambil data XAUUSD. Coba lagi nanti.\n\n🥇 Pilih timeframe lain:",
+            text="❌ Gagal mengambil data XAUUSD. Pastikan FINNHUB_API_KEY sudah di-set.\n\n🥇 Pilih timeframe lain:",
             reply_markup=get_timeframe_keyboard()
         )
         return
@@ -599,7 +565,7 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = fetch_xauusd_data(interval)
     if not data or len(data) < 20:
-        await update.message.reply_text("❌ Gagal mengambil data XAUUSD. Coba lagi nanti.")
+        await update.message.reply_text("❌ Gagal mengambil data. Pastikan FINNHUB_API_KEY sudah di-set.")
         return
     
     await update.message.reply_text("📊 Generating chart...")
@@ -644,7 +610,7 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "❌ Gagal mengambil harga gold. Coba lagi nanti."
+            "❌ Gagal mengambil harga gold. Pastikan FINNHUB_API_KEY sudah di-set."
         )
 
 
@@ -668,7 +634,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Entry, TP, dan SL recommendation
 
 *API yang digunakan:*
-• Yahoo Finance - XAUUSD historical candlestick data
+• Finnhub - XAUUSD historical candlestick data
 • Google Gemini Vision - AI Analysis
 
 ⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""
