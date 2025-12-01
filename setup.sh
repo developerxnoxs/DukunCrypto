@@ -85,8 +85,8 @@ echo "----------------------------------------------"
 print_warning "yfinance membutuhkan beberapa dependencies tambahan..."
 pip install --upgrade requests urllib3 certifi
 pip install lxml html5lib beautifulsoup4
-pip install yfinance
-print_status "yfinance installed"
+pip install yfinance==0.2.40
+print_status "yfinance 0.2.40 installed (versi compatible Termux)"
 
 echo ""
 echo "Langkah 9: Install sisa packages..."

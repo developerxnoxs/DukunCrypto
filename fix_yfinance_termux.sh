@@ -64,14 +64,9 @@ pip install pandas --no-build-isolation --no-cache-dir
 print_status "pandas installed"
 
 echo ""
-echo "Langkah 5: Install yfinance..."
-pip install yfinance --no-cache-dir
-print_status "yfinance installed"
-
-echo ""
-echo "Langkah 6: Remove curl-cffi lagi (kadang terinstall ulang)..."
-pip uninstall curl-cffi -y 2>/dev/null
-print_status "curl-cffi removed"
+echo "Langkah 5: Install yfinance versi 0.2.40 (tanpa curl-cffi)..."
+pip install yfinance==0.2.40 --no-cache-dir
+print_status "yfinance 0.2.40 installed (compatible dengan Termux)"
 
 echo ""
 echo "Langkah 7: Verifikasi..."
