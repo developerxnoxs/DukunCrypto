@@ -2,7 +2,7 @@
 """
 XAUUSD (Gold) Technical Analysis Bot
 Tool CLI untuk analisa teknikal Gold/XAUUSD menggunakan Telegram Bot dan Gemini AI Vision
-Menggunakan Finnhub API untuk data historical gold
+Menggunakan TradingView untuk data historical gold (untuk pembelajaran)
 """
 
 import logging
@@ -18,6 +18,14 @@ from datetime import datetime, timezone, timedelta
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from pytz import timezone as tz
+
+try:
+    from tvDatafeed import TvDatafeed, Interval
+    tv = TvDatafeed()
+    TV_AVAILABLE = True
+except ImportError:
+    TV_AVAILABLE = False
+    tv = None
 
 try:
     import yfinance as yf
@@ -43,9 +51,72 @@ INTERVAL_MAP = {
     "1day": "1d",
 }
 
+TV_INTERVAL_MAP = {
+    "1min": Interval.in_1_minute if TV_AVAILABLE else None,
+    "5min": Interval.in_5_minute if TV_AVAILABLE else None,
+    "15min": Interval.in_15_minute if TV_AVAILABLE else None,
+    "30min": Interval.in_30_minute if TV_AVAILABLE else None,
+    "1hour": Interval.in_1_hour if TV_AVAILABLE else None,
+    "4hour": Interval.in_4_hour if TV_AVAILABLE else None,
+    "1day": Interval.in_daily if TV_AVAILABLE else None,
+}
 
-def fetch_xauusd_data(interval="1hour"):
-    """Mengambil data candlestick XAUUSD dari Yahoo Finance"""
+
+def fetch_xauusd_from_tradingview(interval="1hour", n_bars=200):
+    """Mengambil data candlestick XAUUSD dari TradingView (untuk pembelajaran)"""
+    
+    if not TV_AVAILABLE:
+        logger.error("tvDatafeed library tidak tersedia")
+        return None
+    
+    if interval not in TV_INTERVAL_MAP:
+        logger.error(f"Interval tidak valid: {interval}")
+        return None
+    
+    tv_interval = TV_INTERVAL_MAP[interval]
+    
+    exchanges = ['OANDA', 'FXCM', 'FX_IDC', 'FOREXCOM', 'CAPITALCOM']
+    
+    for exchange in exchanges:
+        try:
+            logger.info(f"Mencoba mengambil data XAUUSD dari TradingView ({exchange}) interval {interval}...")
+            
+            df = tv.get_hist(
+                symbol='XAUUSD',
+                exchange=exchange,
+                interval=tv_interval,
+                n_bars=n_bars
+            )
+            
+            if df is not None and not df.empty:
+                df = df.dropna()
+                if df.empty:
+                    continue
+                
+                candles = []
+                for timestamp, row in df.iterrows():
+                    candles.append([
+                        int(timestamp.timestamp()),
+                        float(row["open"]),
+                        float(row["close"]),
+                        float(row["high"]),
+                        float(row["low"]),
+                        float(row["volume"]) if "volume" in row else 0
+                    ])
+                
+                logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD dari TradingView ({exchange})")
+                return candles
+                
+        except Exception as e:
+            logger.warning(f"Gagal dari {exchange}: {e}")
+            continue
+    
+    logger.error("Gagal mengambil data dari semua exchange TradingView")
+    return None
+
+
+def fetch_xauusd_from_yfinance(interval="1hour"):
+    """Mengambil data candlestick XAUUSD dari Yahoo Finance (fallback)"""
     
     if not yf:
         logger.error("yfinance library tidak tersedia")
@@ -56,16 +127,13 @@ def fetch_xauusd_data(interval="1hour"):
         return None
 
     try:
-        logger.info(f"Mengambil data XAUUSD interval {interval}...")
+        logger.info(f"Mengambil data XAUUSD dari Yahoo Finance interval {interval}...")
         
         yf_interval = INTERVAL_MAP[interval]
+        ticker = yf.Ticker("GC=F")
         
-        # Download data using yfinance
-        ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
-        
-        # Determine period based on interval - use less data for intraday to avoid weekend gaps
         if interval in ["1min", "5min", "15min", "30min"]:
-            period = "3d"  # Changed from 5d to 3d to avoid weekend data
+            period = "3d"
         else:
             period = "1y"
         
@@ -75,22 +143,18 @@ def fetch_xauusd_data(interval="1hour"):
             logger.warning("Tidak ada data XAUUSD dari Yahoo Finance")
             return None
         
-        # Drop NaN values
         df = df.dropna()
         if df.empty:
             logger.warning("Semua data XAUUSD adalah NaN")
             return None
         
-        # For intraday, remove outlier volumes (likely flash trades/gaps)
         if interval in ["1min", "5min", "15min", "30min"]:
             volume_q75 = df['Volume'].quantile(0.75)
             volume_q25 = df['Volume'].quantile(0.25)
             iqr = volume_q75 - volume_q25
             upper_bound = volume_q75 + (1.5 * iqr)
-            # Cap extreme volume spikes
             df['Volume'] = df['Volume'].clip(upper=upper_bound)
         
-        # Convert to candlestick format (list of arrays like btc_analyzer)
         candles = []
         for timestamp, row in df.iterrows():
             candles.append([
@@ -102,29 +166,63 @@ def fetch_xauusd_data(interval="1hour"):
                 float(row["Volume"])
             ])
         
-        logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD")
+        logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD dari Yahoo Finance")
         return candles[-200:] if len(candles) > 200 else candles
         
     except Exception as e:
-        logger.error(f"Error mengambil data XAUUSD: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Error mengambil data XAUUSD dari Yahoo Finance: {e}")
         return None
+
+
+def fetch_xauusd_data(interval="1hour"):
+    """Mengambil data candlestick XAUUSD - prioritas TradingView, fallback ke Yahoo Finance"""
+    
+    if interval not in INTERVAL_MAP:
+        logger.error(f"Interval tidak valid: {interval}")
+        return None
+    
+    data = fetch_xauusd_from_tradingview(interval)
+    
+    if data and len(data) >= 20:
+        logger.info("Data berhasil diambil dari TradingView")
+        return data
+    
+    logger.info("Fallback ke Yahoo Finance...")
+    data = fetch_xauusd_from_yfinance(interval)
+    
+    if data and len(data) >= 20:
+        logger.info("Data berhasil diambil dari Yahoo Finance")
+        return data
+    
+    logger.error("Gagal mengambil data dari semua sumber")
+    return None
 
 
 def get_current_gold_price():
-    """Mengambil harga gold terkini dari Yahoo Finance"""
+    """Mengambil harga gold terkini"""
     
-    if not yf:
-        return None
+    if TV_AVAILABLE:
+        try:
+            df = tv.get_hist(
+                symbol='XAUUSD',
+                exchange='OANDA',
+                interval=Interval.in_1_minute,
+                n_bars=1
+            )
+            if df is not None and not df.empty:
+                return float(df.iloc[-1]["close"])
+        except Exception as e:
+            logger.warning(f"Error getting price from TradingView: {e}")
     
-    try:
-        ticker = yf.Ticker("GC=F")
-        data = ticker.history(period="1d", interval="1m")
-        if not data.empty:
-            return float(data.iloc[-1]["Close"])
-    except Exception as e:
-        logger.error(f"Error getting gold price: {e}")
+    if yf:
+        try:
+            ticker = yf.Ticker("GC=F")
+            data = ticker.history(period="1d", interval="1m")
+            if not data.empty:
+                return float(data.iloc[-1]["Close"])
+        except Exception as e:
+            logger.error(f"Error getting gold price from Yahoo: {e}")
+    
     return None
 
 
@@ -439,7 +537,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text="❌ Gagal mengambil data XAUUSD. Pastikan FINNHUB_API_KEY sudah di-set.\n\n🥇 Pilih timeframe lain:",
+            text="❌ Gagal mengambil data XAUUSD. Coba lagi nanti.\n\n🥇 Pilih timeframe lain:",
             reply_markup=get_timeframe_keyboard()
         )
         return
@@ -565,7 +663,7 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     data = fetch_xauusd_data(interval)
     if not data or len(data) < 20:
-        await update.message.reply_text("❌ Gagal mengambil data. Pastikan FINNHUB_API_KEY sudah di-set.")
+        await update.message.reply_text("❌ Gagal mengambil data XAUUSD. Coba lagi nanti.")
         return
     
     await update.message.reply_text("📊 Generating chart...")
@@ -610,7 +708,7 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     else:
         await update.message.reply_text(
-            "❌ Gagal mengambil harga gold. Pastikan FINNHUB_API_KEY sudah di-set."
+            "❌ Gagal mengambil harga gold. Coba lagi nanti."
         )
 
 
@@ -633,8 +731,9 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Sinyal BUY/SELL/HOLD
 • Entry, TP, dan SL recommendation
 
-*API yang digunakan:*
-• Finnhub - XAUUSD historical candlestick data
+*Data Source:*
+• TradingView - XAUUSD historical candlestick data (pembelajaran)
+• Yahoo Finance - Fallback data source
 • Google Gemini Vision - AI Analysis
 
 ⚠️ *Disclaimer:* Bot ini hanya untuk edukasi. Bukan financial advice."""
@@ -662,7 +761,8 @@ def main():
     
     print("🥇 Starting XAUUSD (Gold) Analysis Bot...")
     print(f"📊 Telegram Token: {TELEGRAM_BOT_TOKEN[:10]}...")
-    print(f"📊 Data Source: Yahoo Finance (GC=F)")
+    print(f"📊 Data Source: TradingView (XAUUSD) + Yahoo Finance fallback")
+    print(f"📊 TradingView: {'Available' if TV_AVAILABLE else 'Not available'}")
     print(f"🤖 Gemini API: {'Configured' if GEMINI_API_KEY else 'Not configured'}")
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
