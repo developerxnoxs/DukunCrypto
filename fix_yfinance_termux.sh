@@ -22,7 +22,12 @@ print_error() {
     echo -e "${RED}[✗]${NC} $1"
 }
 
-echo "Langkah 1: Uninstall yfinance yang bermasalah..."
+echo "Langkah 1: Uninstall curl-cffi (tidak support Termux)..."
+pip uninstall curl-cffi -y 2>/dev/null
+print_status "curl-cffi removed (akan fallback ke requests)"
+
+echo ""
+echo "Langkah 2: Uninstall yfinance yang bermasalah..."
 pip uninstall yfinance -y 2>/dev/null
 pip uninstall pandas -y 2>/dev/null
 print_status "Uninstalled old packages"
@@ -64,7 +69,12 @@ pip install yfinance --no-cache-dir
 print_status "yfinance installed"
 
 echo ""
-echo "Langkah 6: Verifikasi..."
+echo "Langkah 6: Remove curl-cffi lagi (kadang terinstall ulang)..."
+pip uninstall curl-cffi -y 2>/dev/null
+print_status "curl-cffi removed"
+
+echo ""
+echo "Langkah 7: Verifikasi..."
 echo "----------------------------------------------"
 python -c "
 try:
