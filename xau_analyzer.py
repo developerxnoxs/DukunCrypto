@@ -57,53 +57,67 @@ def fetch_xauusd_data(interval="1hour"):
         logger.error(f"Interval tidak valid: {interval}")
         return None
 
+    yf_interval = INTERVAL_MAP[interval]
+    
+    if interval in ["1min", "5min", "15min", "30min"]:
+        period = "5d"
+    else:
+        period = "1y"
+    
+    symbols = ["GC=F", "GLD", "IAU"]
+    df = None
+    
+    for symbol in symbols:
+        try:
+            logger.info(f"Mengambil data {symbol} interval {interval}...")
+            
+            df = yf.download(symbol, period=period, interval=yf_interval, progress=False)
+            
+            if df is not None and not df.empty:
+                logger.info(f"Berhasil mendapat data dari {symbol}")
+                break
+            else:
+                logger.warning(f"Tidak ada data dari {symbol}, mencoba symbol lain...")
+        except Exception as e:
+            logger.warning(f"Gagal mengambil data {symbol}: {e}")
+            continue
+    
+    if df is None or df.empty:
+        logger.error("Semua symbol gagal, tidak ada data XAUUSD")
+        return None
+    
     try:
-        logger.info(f"Mengambil data XAUUSD interval {interval}...")
-        
-        yf_interval = INTERVAL_MAP[interval]
-        
-        # Download data using yfinance
-        ticker = yf.Ticker("GC=F")  # Gold futures (XAUUSD proxy)
-        
-        # Determine period based on interval - use less data for intraday to avoid weekend gaps
-        if interval in ["1min", "5min", "15min", "30min"]:
-            period = "3d"  # Changed from 5d to 3d to avoid weekend data
-        else:
-            period = "1y"
-        
-        df = ticker.history(period=period, interval=yf_interval)
-        
-        if df.empty:
-            logger.warning("Tidak ada data XAUUSD dari Yahoo Finance")
-            return None
-        
-        # Drop NaN values
         df = df.dropna()
         if df.empty:
             logger.warning("Semua data XAUUSD adalah NaN")
             return None
         
-        # For intraday, remove outlier volumes (likely flash trades/gaps)
         if interval in ["1min", "5min", "15min", "30min"]:
-            volume_q75 = df['Volume'].quantile(0.75)
-            volume_q25 = df['Volume'].quantile(0.25)
-            iqr = volume_q75 - volume_q25
-            upper_bound = volume_q75 + (1.5 * iqr)
-            # Cap extreme volume spikes
-            df['Volume'] = df['Volume'].clip(upper=upper_bound)
+            if 'Volume' in df.columns and len(df) > 0:
+                volume_q75 = df['Volume'].quantile(0.75)
+                volume_q25 = df['Volume'].quantile(0.25)
+                iqr = volume_q75 - volume_q25
+                upper_bound = volume_q75 + (1.5 * iqr)
+                df['Volume'] = df['Volume'].clip(upper=upper_bound)
         
-        # Convert to candlestick format (list of arrays like btc_analyzer)
         candles = []
         for timestamp, row in df.iterrows():
-            candles.append([
-                int(timestamp.timestamp()),
-                float(row["Open"]),
-                float(row["Close"]),
-                float(row["High"]),
-                float(row["Low"]),
-                float(row["Volume"])
-            ])
+            try:
+                candles.append([
+                    int(timestamp.timestamp()),
+                    float(row["Open"]),
+                    float(row["Close"]),
+                    float(row["High"]),
+                    float(row["Low"]),
+                    float(row.get("Volume", 0))
+                ])
+            except:
+                continue
         
+        if len(candles) == 0:
+            logger.warning("Tidak ada candle yang valid")
+            return None
+            
         logger.info(f"Berhasil mengambil {len(candles)} candle XAUUSD")
         return candles[-200:] if len(candles) > 200 else candles
         
@@ -120,13 +134,17 @@ def get_current_gold_price():
     if not yf:
         return None
     
-    try:
-        ticker = yf.Ticker("GC=F")
-        data = ticker.history(period="1d", interval="1m")
-        if not data.empty:
-            return float(data.iloc[-1]["Close"])
-    except Exception as e:
-        logger.error(f"Error getting gold price: {e}")
+    symbols = ["GC=F", "GLD", "IAU"]
+    
+    for symbol in symbols:
+        try:
+            df = yf.download(symbol, period="1d", interval="1m", progress=False)
+            if df is not None and not df.empty:
+                return float(df.iloc[-1]["Close"])
+        except Exception as e:
+            logger.warning(f"Error getting price from {symbol}: {e}")
+            continue
+    
     return None
 
 
