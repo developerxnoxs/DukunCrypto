@@ -84,19 +84,135 @@ TV_INTERVAL_MAP = {
 }
 
 
-def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
-    """Mengambil data candlestick dari KuCoin API untuk berbagai coin"""
-    pair = f"{symbol}-USDT"
+def fetch_crypto_from_tradingview(symbol="BTC", interval="1hour", n_bars=200):
+    """Mengambil data candlestick Crypto dari TradingView"""
+    
+    if not TV_AVAILABLE:
+        logger.error("tvDatafeed library tidak tersedia")
+        return None
+    
+    if interval not in TV_INTERVAL_MAP:
+        logger.error(f"Interval tidak valid untuk TradingView: {interval}")
+        return None
+    
+    if symbol not in SUPPORTED_COINS:
+        logger.error(f"Symbol tidak valid: {symbol}")
+        return None
+    
+    tv_interval = TV_INTERVAL_MAP[interval]
+    tv_symbol = SUPPORTED_COINS[symbol].get("tv_symbol", f"{symbol}USDT")
+    
+    exchanges = ['BINANCE', 'BYBIT', 'COINBASE', 'KRAKEN', 'BITSTAMP']
+    
+    for exchange in exchanges:
+        try:
+            logger.info(f"Mencoba mengambil data {tv_symbol} dari TradingView ({exchange}) interval {interval}...")
+            
+            df = tv.get_hist(
+                symbol=tv_symbol,
+                exchange=exchange,
+                interval=tv_interval,
+                n_bars=n_bars
+            )
+            
+            if df is not None and not df.empty:
+                df = df.dropna()
+                if df.empty:
+                    continue
+                
+                candles = []
+                for timestamp, row in df.iterrows():
+                    candles.append([
+                        int(timestamp.timestamp()),
+                        float(row["open"]),
+                        float(row["close"]),
+                        float(row["high"]),
+                        float(row["low"]),
+                        float(row["volume"]) if "volume" in row else 0
+                    ])
+                
+                logger.info(f"Berhasil mengambil {len(candles)} candle {tv_symbol} dari TradingView ({exchange})")
+                return candles
+                
+        except Exception as e:
+            logger.warning(f"Gagal dari {exchange}: {e}")
+            continue
+    
+    logger.error(f"Gagal mengambil data {tv_symbol} dari semua exchange TradingView")
+    return None
+
+
+def fetch_crypto_from_yfinance(symbol="BTC", interval="1hour"):
+    """Mengambil data candlestick Crypto dari Yahoo Finance (fallback)"""
+    
+    if not yf:
+        logger.error("yfinance library tidak tersedia")
+        return None
     
     if interval not in INTERVAL_MAP:
         logger.error(f"Interval tidak valid: {interval}")
         return None
     
-    end_at = int(datetime.now(timezone.utc).timestamp())
-    start_at = end_at - INTERVAL_MAP[interval] * candle_limit
+    if symbol not in SUPPORTED_COINS:
+        logger.error(f"Symbol tidak valid: {symbol}")
+        return None
 
     try:
-        logger.info(f"Mengambil data {pair} interval {interval}...")
+        yf_symbol = SUPPORTED_COINS[symbol]["yf_symbol"]
+        logger.info(f"Mengambil data {symbol} dari Yahoo Finance ({yf_symbol}) interval {interval}...")
+        
+        yf_interval = INTERVAL_MAP[interval]
+        ticker = yf.Ticker(yf_symbol)
+        
+        if interval in ["1min", "5min", "15min", "30min"]:
+            period = "3d"
+        else:
+            period = "1y"
+        
+        df = ticker.history(period=period, interval=yf_interval)
+        
+        if df.empty:
+            logger.warning(f"Tidak ada data {symbol} dari Yahoo Finance")
+            return None
+        
+        df = df.dropna()
+        if df.empty:
+            logger.warning(f"Semua data {symbol} adalah NaN")
+            return None
+        
+        candles = []
+        for timestamp, row in df.iterrows():
+            volume = float(row["Volume"]) if "Volume" in row and pd.notna(row["Volume"]) else 0
+            candles.append([
+                int(timestamp.timestamp()),
+                float(row["Open"]),
+                float(row["Close"]),
+                float(row["High"]),
+                float(row["Low"]),
+                volume
+            ])
+        
+        logger.info(f"Berhasil mengambil {len(candles)} candle {symbol} dari Yahoo Finance")
+        return candles[-200:] if len(candles) > 200 else candles
+        
+    except Exception as e:
+        logger.error(f"Error mengambil data {symbol} dari Yahoo Finance: {e}")
+        return None
+
+
+def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
+    """Mengambil data candlestick dari KuCoin API untuk berbagai coin (fallback)"""
+    pair = f"{symbol}-USDT"
+    
+    if interval not in KUCOIN_INTERVAL_MAP:
+        logger.error(f"Interval tidak valid untuk KuCoin: {interval}")
+        return None
+    
+    end_at = int(datetime.now(timezone.utc).timestamp())
+    start_at = end_at - KUCOIN_INTERVAL_MAP[interval] * candle_limit
+
+    try:
+        logger.info(f"Mengambil data {pair} dari KuCoin interval {interval}...")
         response = requests.get(
             "https://api.kucoin.com/api/v1/market/candles",
             params={
@@ -116,11 +232,11 @@ def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
         
         candles = data.get("data", [])
         if not candles:
-            logger.warning("Tidak ada data candle yang diterima")
+            logger.warning("Tidak ada data candle yang diterima dari KuCoin")
             return None
             
         sorted_candles = sorted(candles, key=lambda x: int(x[0]))
-        logger.info(f"Berhasil mengambil {len(sorted_candles)} candle untuk {pair}")
+        logger.info(f"Berhasil mengambil {len(sorted_candles)} candle untuk {pair} dari KuCoin")
         return sorted_candles
         
     except requests.exceptions.Timeout:
@@ -134,8 +250,67 @@ def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
         return None
 
 
+def fetch_crypto_data(symbol="BTC", interval="1hour"):
+    """Mengambil data candlestick Crypto - prioritas TradingView, fallback ke Yahoo Finance, lalu KuCoin"""
+    
+    if symbol not in SUPPORTED_COINS:
+        logger.error(f"Symbol tidak valid: {symbol}")
+        return None
+    
+    data = fetch_crypto_from_tradingview(symbol, interval)
+    
+    if data and len(data) >= 20:
+        logger.info(f"Data {symbol} berhasil diambil dari TradingView")
+        return data
+    
+    logger.info("Fallback ke Yahoo Finance...")
+    data = fetch_crypto_from_yfinance(symbol, interval)
+    
+    if data and len(data) >= 20:
+        logger.info(f"Data {symbol} berhasil diambil dari Yahoo Finance")
+        return data
+    
+    logger.info("Fallback ke KuCoin...")
+    data = fetch_crypto_kucoin(symbol, interval)
+    
+    if data and len(data) >= 20:
+        logger.info(f"Data {symbol} berhasil diambil dari KuCoin")
+        return data
+    
+    logger.error(f"Gagal mengambil data {symbol} dari semua sumber")
+    return None
+
+
 def get_current_price(symbol="BTC"):
-    """Mengambil harga terkini dari KuCoin"""
+    """Mengambil harga terkini - prioritas TradingView"""
+    
+    if symbol not in SUPPORTED_COINS:
+        return None
+    
+    if TV_AVAILABLE:
+        try:
+            tv_symbol = SUPPORTED_COINS[symbol].get("tv_symbol", f"{symbol}USDT")
+            df = tv.get_hist(
+                symbol=tv_symbol,
+                exchange='BINANCE',
+                interval=Interval.in_1_minute,
+                n_bars=1
+            )
+            if df is not None and not df.empty:
+                return float(df.iloc[-1]["close"])
+        except Exception as e:
+            logger.warning(f"Error getting {symbol} price from TradingView: {e}")
+    
+    if yf:
+        try:
+            yf_symbol = SUPPORTED_COINS[symbol]["yf_symbol"]
+            ticker = yf.Ticker(yf_symbol)
+            data = ticker.history(period="1d", interval="1m")
+            if not data.empty:
+                return float(data.iloc[-1]["Close"])
+        except Exception as e:
+            logger.warning(f"Error getting {symbol} price from Yahoo: {e}")
+    
     pair = f"{symbol}-USDT"
     try:
         response = requests.get(
@@ -147,7 +322,8 @@ def get_current_price(symbol="BTC"):
         if data.get("code") == "200000" and data.get("data"):
             return float(data["data"].get("price", 0))
     except Exception as e:
-        logger.error(f"Error getting price: {e}")
+        logger.error(f"Error getting price from KuCoin: {e}")
+    
     return None
 
 
@@ -198,7 +374,7 @@ def generate_candlestick_chart(data, filename="chart.png", symbol="BTC", tf="15m
 
         mpf.plot(
             df, type='candle', volume=True, style=style,
-            title=f"\n{symbol}/USDT ({tf}) - KuCoin",
+            title=f"\n{symbol}/USDT ({tf}) - TradingView",
             ylabel="Price (USDT)",
             ylabel_lower="Volume",
             savefig=dict(fname=filename, dpi=150, bbox_inches='tight'),
@@ -590,13 +766,13 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     except Exception:
         pass
     
-    data = fetch_crypto_kucoin(symbol, interval)
+    data = fetch_crypto_data(symbol, interval)
     
     if not data:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=status_message.message_id,
-            text=f"❌ Gagal mengambil data {symbol} dari KuCoin. Coba lagi nanti.",
+            text=f"❌ Gagal mengambil data {symbol}. Coba lagi nanti.",
             reply_markup=get_after_analysis_keyboard(symbol)
         )
         return
@@ -739,7 +915,7 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(f"⏳ Mengambil data {coin_info['emoji']} {symbol}/USDT ({interval})...")
     
-    data = fetch_crypto_kucoin(symbol, interval)
+    data = fetch_crypto_data(symbol, interval)
     if not data or len(data) < 20:
         await update.message.reply_text("❌ Gagal mengambil data atau data terlalu sedikit.")
         return
