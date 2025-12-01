@@ -14,16 +14,10 @@ import sys
 import requests
 import mplfinance as mpf
 import pandas as pd
-import asyncio
 from datetime import datetime, timezone, timedelta
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from pytz import timezone as tz
-from collections import deque
-
-try:
-    import websockets
-    WS_AVAILABLE = True
-except ImportError:
-    WS_AVAILABLE = False
 
 try:
     from tvDatafeed import TvDatafeed, Interval
@@ -37,14 +31,6 @@ try:
     import yfinance as yf
 except ImportError:
     yf = None
-
-try:
-    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-    from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-except ImportError:
-    from telegram.ext import InlineKeyboardButton, InlineKeyboardMarkup, Update, Application, CommandHandler, CallbackQueryHandler, ContextTypes
-
-LIVE_PRICES = {}
 
 logging.basicConfig(
     level=logging.INFO,
@@ -246,45 +232,11 @@ def fetch_forex_data(symbol="XAUUSD", interval="1hour"):
     return None
 
 
-async def websocket_stream_prices():
-    """WebSocket streaming untuk real-time prices dari TradingView"""
-    while True:
-        try:
-            uri = "wss://stream.tradingview.com/socket.io/?transport=websocket"
-            async with websockets.connect(uri) as websocket:
-                logger.info("✅ WebSocket connected untuk streaming real-time prices")
-                
-                subscribe_msg = json.dumps({
-                    "m": "subscribe_quotes",
-                    "params": ["OANDA:XAUUSD", "OANDA:EURUSD", "OANDA:GBPUSD", "OANDA:USDJPY"]
-                })
-                await websocket.send(subscribe_msg)
-                
-                async for message in websocket:
-                    try:
-                        data = json.loads(message)
-                        if "symbol" in data and "last_price" in data:
-                            symbol = data["symbol"].split(":")[1]
-                            if symbol in FOREX_PAIRS:
-                                LIVE_PRICES[symbol] = data["last_price"]
-                                logger.debug(f"📊 {symbol}: {data['last_price']}")
-                    except Exception as e:
-                        logger.debug(f"WebSocket parse error: {e}")
-                        continue
-                        
-        except Exception as e:
-            logger.warning(f"WebSocket connection lost: {e}. Reconnecting in 5s...")
-            await asyncio.sleep(5)
-
-
 def get_current_price(symbol="XAUUSD"):
-    """Mengambil harga terkini dari WebSocket atau REST API"""
+    """Mengambil harga terkini untuk symbol tertentu"""
     
     if symbol not in FOREX_PAIRS:
         return None
-    
-    if symbol in LIVE_PRICES:
-        return float(LIVE_PRICES[symbol])
     
     if TV_AVAILABLE:
         try:
@@ -295,11 +247,9 @@ def get_current_price(symbol="XAUUSD"):
                 n_bars=1
             )
             if df is not None and not df.empty:
-                price = float(df.iloc[-1]["close"])
-                LIVE_PRICES[symbol] = price
-                return price
+                return float(df.iloc[-1]["close"])
         except Exception as e:
-            logger.debug(f"Error getting {symbol} price from TradingView: {e}")
+            logger.warning(f"Error getting {symbol} price from TradingView: {e}")
     
     if yf:
         try:
@@ -307,11 +257,9 @@ def get_current_price(symbol="XAUUSD"):
             ticker = yf.Ticker(yf_symbol)
             data = ticker.history(period="1d", interval="1m")
             if not data.empty:
-                price = float(data.iloc[-1]["Close"])
-                LIVE_PRICES[symbol] = price
-                return price
+                return float(data.iloc[-1]["Close"])
         except Exception as e:
-            logger.debug(f"Error getting {symbol} price from Yahoo: {e}")
+            logger.error(f"Error getting {symbol} price from Yahoo: {e}")
     
     return None
 
@@ -957,8 +905,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Entry, TP, dan SL recommendation
 
 *Data Source:*
-• TradingView WebSocket - Real-time streaming prices
-• TradingView REST API - Historical candlestick data
+• TradingView - Historical candlestick data
 • Yahoo Finance - Fallback data source
 • Google Gemini Vision - AI Analysis
 
@@ -976,17 +923,20 @@ def main():
     """Fungsi utama untuk menjalankan bot"""
     if not TELEGRAM_BOT_TOKEN:
         print("❌ Error: TELEGRAM_BOT_TOKEN_XAU tidak ditemukan!")
+        print("Set environment variable: export TELEGRAM_BOT_TOKEN_XAU='your_token'")
+        print("Buat bot baru di @BotFather untuk Forex analyzer")
         sys.exit(1)
     
     if not GEMINI_API_KEY:
         print("⚠️ Warning: GEMINI_API_KEY tidak ditemukan!")
+        print("Analisa AI tidak akan berfungsi tanpa API key.")
+        print("Set environment variable: export GEMINI_API_KEY='your_key'")
     
     print("📊 Starting Forex & Commodities Analysis Bot...")
     print(f"📊 Telegram Token: {TELEGRAM_BOT_TOKEN[:10]}...")
     print(f"📊 Supported Pairs: {len(FOREX_PAIRS)} symbols")
-    print(f"📊 Data Source: TradingView REST API + Yahoo Finance")
+    print(f"📊 Data Source: TradingView + Yahoo Finance fallback")
     print(f"📊 TradingView: {'Available' if TV_AVAILABLE else 'Not available'}")
-    print(f"📊 WebSocket: {'Available' if WS_AVAILABLE else 'Not available'}")
     print(f"🤖 Gemini API: {'Configured' if GEMINI_API_KEY else 'Not configured'}")
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
@@ -1000,10 +950,6 @@ def main():
     app.add_error_handler(error_handler)
     
     print("✅ Bot Forex siap menerima pesan!")
-    if WS_AVAILABLE:
-        print("📡 WebSocket streaming untuk real-time prices: READY")
-    print("🚀 Bot polling dimulai...")
-    
     app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
