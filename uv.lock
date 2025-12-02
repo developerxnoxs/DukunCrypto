@@ -906,6 +906,9 @@ dependencies = [
     { name = "python-telegram-bot" },
     { name = "pytz" },
     { name = "requests" },
+    { name = "telegram" },
+    { name = "websocket-client" },
+    { name = "xnoxs-fetcher" },
     { name = "yfinance" },
 ]
 
@@ -918,6 +921,9 @@ requires-dist = [
     { name = "python-telegram-bot", specifier = ">=22.5" },
     { name = "pytz", specifier = ">=2025.2" },
     { name = "requests", specifier = ">=2.32.5" },
+    { name = "telegram", specifier = ">=0.0.1" },
+    { name = "websocket-client", specifier = ">=1.9.0" },
+    { name = "xnoxs-fetcher", specifier = ">=3.0.0" },
     { name = "yfinance", specifier = ">=0.2.66" },
 ]
 
@@ -955,6 +961,12 @@ wheels = [
 ]
 
 [[package]]
+name = "telegram"
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9d/ca/8bdf2deb93b9f6971dabf2ddc827c2a98ce23e13582a15b37e9bc169f226/telegram-0.0.1.tar.gz", hash = "sha256:d405a0af4c868a8dbeae6d03e297e21c7ee6269e11e2ed3810e15544aba02591", size = 879, upload-time = "2015-09-29T07:32:18.348Z" }
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 source = { registry = "https://pypi.org/simple" }
@@ -979,6 +991,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/15/22/9ee70a2574a4f4599c47dd506532914ce044817c7752a79b6a51286319bc/urllib3-2.5.0.tar.gz", hash = "sha256:3fc47733c7e419d4bc3f6b3dc2b4f890bb743906a30d56ba4a5bfa4bbff92760", size = 393185, upload-time = "2025-06-18T14:07:41.644Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a7/c2/fe1e52489ae3122415c51f387e221dd0773709bad6c6cdaa599e8a2c5185/urllib3-2.5.0-py3-none-any.whl", hash = "sha256:e6b01673c0fa6a13e374b50871808eb3bf7046c4b125b216f6bf1cc604cff0dc", size = 129795, upload-time = "2025-06-18T14:07:40.39Z" },
+]
+
+[[package]]
+name = "websocket-client"
+version = "1.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/2c/41/aa4bf9664e4cda14c3b39865b12251e8e7d239f4cd0e3cc1b6c2ccde25c1/websocket_client-1.9.0.tar.gz", hash = "sha256:9e813624b6eb619999a97dc7958469217c3176312b3a16a4bd1bc7e08a46ec98", size = 70576, upload-time = "2025-10-07T21:16:36.495Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/34/db/b10e48aa8fff7407e67470363eac595018441cf32d5e1001567a7aeba5d2/websocket_client-1.9.0-py3-none-any.whl", hash = "sha256:af248a825037ef591efbf6ed20cc5faa03d3b47b9e5a2230a529eeee1c1fc3ef", size = 82616, upload-time = "2025-10-07T21:16:34.951Z" },
 ]
 
 [[package]]
@@ -1021,6 +1042,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/86/eb/20b6cdf273913d0ad05a6a14aed4b9a85591c18a987a3d47f20fa13dcc47/websockets-15.0.1-cp313-cp313-win32.whl", hash = "sha256:ba9e56e8ceeeedb2e080147ba85ffcd5cd0711b89576b83784d8605a7df455fa", size = 176393, upload-time = "2025-03-05T20:02:53.814Z" },
     { url = "https://files.pythonhosted.org/packages/1b/6c/c65773d6cab416a64d191d6ee8a8b1c68a09970ea6909d16965d26bfed1e/websockets-15.0.1-cp313-cp313-win_amd64.whl", hash = "sha256:e09473f095a819042ecb2ab9465aee615bd9c2028e4ef7d933600a8401c79561", size = 176837, upload-time = "2025-03-05T20:02:55.237Z" },
     { url = "https://files.pythonhosted.org/packages/fa/a8/5b41e0da817d64113292ab1f8247140aac61cbf6cfd085d6a0fa77f4984f/websockets-15.0.1-py3-none-any.whl", hash = "sha256:f7a866fbc1e97b5c617ee4116daaa09b722101d4a3c170c787450ba409f9736f", size = 169743, upload-time = "2025-03-05T20:03:39.41Z" },
+]
+
+[[package]]
+name = "xnoxs-fetcher"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pandas" },
+    { name = "python-dateutil" },
+    { name = "requests" },
+    { name = "websocket-client" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bc/2c/7417a04fa008dcaf8e0b43d4b3c36c23fc9c72dfc41c67747516c16d647b/xnoxs_fetcher-3.0.0.tar.gz", hash = "sha256:64ed9b04fab1d8c0b03e1c7b404542c3cffbd68134f978b67568b26820888001", size = 24094, upload-time = "2025-12-02T01:09:37.6Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/67/764a09056ea8441e4d10a8b130e668e86811f3c2ef71d1adbc9c48b401e5/xnoxs_fetcher-3.0.0-py3-none-any.whl", hash = "sha256:84d8bc39b2cbb8493476ba84f99da01f839de42ec609ac1865b2e0b17ffa08d6", size = 19679, upload-time = "2025-12-02T01:09:35.576Z" },
 ]
 
 [[package]]

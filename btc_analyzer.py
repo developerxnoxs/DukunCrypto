@@ -21,12 +21,12 @@ from pytz import timezone as tz
 import asyncio
 
 try:
-    from tvDatafeed import TvDatafeed, Interval
-    tv = TvDatafeed()
+    from xnoxs_fetcher import XnoxsFetcher, TimeFrame
+    fetcher = XnoxsFetcher()
     TV_AVAILABLE = True
 except ImportError:
     TV_AVAILABLE = False
-    tv = None
+    fetcher = None
 
 try:
     import yfinance as yf
@@ -73,22 +73,22 @@ KUCOIN_INTERVAL_MAP = {
 }
 
 TV_INTERVAL_MAP = {
-    "1min": Interval.in_1_minute if TV_AVAILABLE else None,
-    "5min": Interval.in_5_minute if TV_AVAILABLE else None,
-    "15min": Interval.in_15_minute if TV_AVAILABLE else None,
-    "30min": Interval.in_30_minute if TV_AVAILABLE else None,
-    "1hour": Interval.in_1_hour if TV_AVAILABLE else None,
-    "4hour": Interval.in_4_hour if TV_AVAILABLE else None,
-    "1day": Interval.in_daily if TV_AVAILABLE else None,
-    "1week": Interval.in_weekly if TV_AVAILABLE else None,
+    "1min": TimeFrame.MINUTE_1 if TV_AVAILABLE else None,
+    "5min": TimeFrame.MINUTE_5 if TV_AVAILABLE else None,
+    "15min": TimeFrame.MINUTE_15 if TV_AVAILABLE else None,
+    "30min": TimeFrame.MINUTE_30 if TV_AVAILABLE else None,
+    "1hour": TimeFrame.HOUR_1 if TV_AVAILABLE else None,
+    "4hour": TimeFrame.HOUR_4 if TV_AVAILABLE else None,
+    "1day": TimeFrame.DAILY if TV_AVAILABLE else None,
+    "1week": TimeFrame.WEEKLY if TV_AVAILABLE else None,
 }
 
 
 def fetch_crypto_from_tradingview(symbol="BTC", interval="1hour", n_bars=200):
-    """Mengambil data candlestick Crypto dari TradingView"""
+    """Mengambil data candlestick Crypto dari TradingView menggunakan xnoxs-fetcher"""
     
     if not TV_AVAILABLE:
-        logger.error("tvDatafeed library tidak tersedia")
+        logger.error("xnoxs-fetcher library tidak tersedia")
         return None
     
     if interval not in TV_INTERVAL_MAP:
@@ -108,11 +108,11 @@ def fetch_crypto_from_tradingview(symbol="BTC", interval="1hour", n_bars=200):
         try:
             logger.info(f"Mencoba mengambil data {tv_symbol} dari TradingView ({exchange}) interval {interval}...")
             
-            df = tv.get_hist(
+            df = fetcher.get_historical_data(
                 symbol=tv_symbol,
                 exchange=exchange,
-                interval=tv_interval,
-                n_bars=n_bars
+                timeframe=tv_interval,
+                bars=n_bars
             )
             
             if df is not None and not df.empty:
@@ -290,11 +290,11 @@ def get_current_price(symbol="BTC"):
     if TV_AVAILABLE:
         try:
             tv_symbol = SUPPORTED_COINS[symbol].get("tv_symbol", f"{symbol}USDT")
-            df = tv.get_hist(
+            df = fetcher.get_historical_data(
                 symbol=tv_symbol,
                 exchange='BINANCE',
-                interval=Interval.in_1_minute,
-                n_bars=1
+                timeframe=TimeFrame.MINUTE_1,
+                bars=1
             )
             if df is not None and not df.empty:
                 return float(df.iloc[-1]["close"])
