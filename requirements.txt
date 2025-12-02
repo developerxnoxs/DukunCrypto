@@ -1,0 +1,18 @@
+# AI Trading Analysis Bots - Requirements
+# Install with: pip install -r requirements.txt
+
+# Core Dependencies
+python-telegram-bot>=21.0
+mplfinance>=0.12.10b0
+pandas>=2.2.0
+requests>=2.31.0
+pytz>=2024.1
+pillow>=10.0.0
+
+# Data Sources
+xnoxs-fetcher>=4.0.0      # TradingView data wrapper
+yfinance>=0.2.40          # Yahoo Finance fallback
+websocket-client>=1.7.0   # WebSocket support
+
+# Async Support
+nest-asyncio>=1.6.0       # Nested async loop support

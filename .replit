@@ -32,18 +32,18 @@ outputType = "console"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uv run python btc_analyzer.py"
+args = "uv run python src/btc_analyzer.py"
 
 [[workflows.workflow]]
 name = "Forex Analyzer Bot"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "uv run python xau_analyzer.py"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uv run python src/xau_analyzer.py"
 
 [[workflows.workflow]]
 name = "combine"
