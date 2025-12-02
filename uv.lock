@@ -921,7 +921,7 @@ requires-dist = [
     { name = "pytz", specifier = ">=2025.2" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "websocket-client", specifier = ">=1.9.0" },
-    { name = "xnoxs-fetcher", specifier = ">=3.0.0" },
+    { name = "xnoxs-fetcher", specifier = ">=4.0.0" },
     { name = "yfinance", specifier = ">=0.2.66" },
 ]
 
@@ -1038,7 +1038,7 @@ wheels = [
 
 [[package]]
 name = "xnoxs-fetcher"
-version = "3.0.0"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pandas" },
@@ -1046,9 +1046,9 @@ dependencies = [
     { name = "requests" },
     { name = "websocket-client" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bc/2c/7417a04fa008dcaf8e0b43d4b3c36c23fc9c72dfc41c67747516c16d647b/xnoxs_fetcher-3.0.0.tar.gz", hash = "sha256:64ed9b04fab1d8c0b03e1c7b404542c3cffbd68134f978b67568b26820888001", size = 24094, upload-time = "2025-12-02T01:09:37.6Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/00/f0/38e79285bb7cfd4361cb668836e6a54914b9259304cffd3675cc8ba78175/xnoxs_fetcher-4.0.0.tar.gz", hash = "sha256:c3502f3672a99fc09dba92880c161edd12b7c641b5668307f0fd969a3726b9cd", size = 36965, upload-time = "2025-12-02T20:05:53.966Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/24/67/764a09056ea8441e4d10a8b130e668e86811f3c2ef71d1adbc9c48b401e5/xnoxs_fetcher-3.0.0-py3-none-any.whl", hash = "sha256:84d8bc39b2cbb8493476ba84f99da01f839de42ec609ac1865b2e0b17ffa08d6", size = 19679, upload-time = "2025-12-02T01:09:35.576Z" },
+    { url = "https://files.pythonhosted.org/packages/df/e6/bca60ed2c0065d39c8dae1fd3114da4ef2cd60817b9142bb3fe523907160/xnoxs_fetcher-4.0.0-py3-none-any.whl", hash = "sha256:9ec73def250c625c84f0b7464a03ed3f06a2e0277cf9a30c8eab90a3cdf77ba1", size = 33416, upload-time = "2025-12-02T20:05:52.227Z" },
 ]
 
 [[package]]
