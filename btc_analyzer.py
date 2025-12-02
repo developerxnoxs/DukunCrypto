@@ -336,8 +336,55 @@ def get_current_price(symbol="BTC"):
     return None
 
 
+def calculate_rsi(series, period=14):
+    """Calculate RSI (Relative Strength Index)"""
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def calculate_macd(series, fast=12, slow=26, signal=9):
+    """Calculate MACD (Moving Average Convergence Divergence)"""
+    ema_fast = series.ewm(span=fast, adjust=False).mean()
+    ema_slow = series.ewm(span=slow, adjust=False).mean()
+    macd_line = ema_fast - ema_slow
+    signal_line = macd_line.ewm(span=signal, adjust=False).mean()
+    histogram = macd_line - signal_line
+    return macd_line, signal_line, histogram
+
+
+def calculate_bollinger_bands(series, period=20, std_dev=2):
+    """Calculate Bollinger Bands"""
+    sma = series.rolling(window=period).mean()
+    std = series.rolling(window=period).std()
+    upper_band = sma + (std * std_dev)
+    lower_band = sma - (std * std_dev)
+    return upper_band, sma, lower_band
+
+
+def calculate_fibonacci_levels(df):
+    """Calculate Fibonacci retracement levels based on recent swing high/low"""
+    high = df['High'].max()
+    low = df['Low'].min()
+    diff = high - low
+    
+    levels = {
+        '0.0%': high,
+        '23.6%': high - (diff * 0.236),
+        '38.2%': high - (diff * 0.382),
+        '50.0%': high - (diff * 0.5),
+        '61.8%': high - (diff * 0.618),
+        '78.6%': high - (diff * 0.786),
+        '100.0%': low
+    }
+    return levels
+
+
 def generate_candlestick_chart(data, filename="chart.png", symbol="BTC", tf="15min"):
-    """Generate chart candlestick dari data OHLCV"""
+    """Generate chart candlestick dengan RSI, MACD, Bollinger Bands, dan Fibonacci"""
     if not data:
         logger.error("Data kosong, tidak bisa generate chart")
         return None
@@ -376,22 +423,56 @@ def generate_candlestick_chart(data, filename="chart.png", symbol="BTC", tf="15m
         ema20 = df['Close'].ewm(span=20, adjust=False).mean()
         ema50 = df['Close'].ewm(span=50, adjust=False).mean()
         
+        bb_upper, bb_middle, bb_lower = calculate_bollinger_bands(df['Close'])
+        
+        rsi = calculate_rsi(df['Close'])
+        rsi_overbought = pd.Series([70] * len(df), index=df.index)
+        rsi_oversold = pd.Series([30] * len(df), index=df.index)
+        
+        macd_line, signal_line, macd_histogram = calculate_macd(df['Close'])
+        
+        fib_levels = calculate_fibonacci_levels(df)
+        fib_236 = pd.Series([fib_levels['23.6%']] * len(df), index=df.index)
+        fib_382 = pd.Series([fib_levels['38.2%']] * len(df), index=df.index)
+        fib_500 = pd.Series([fib_levels['50.0%']] * len(df), index=df.index)
+        fib_618 = pd.Series([fib_levels['61.8%']] * len(df), index=df.index)
+        
+        macd_colors = ['#00AA00' if val >= 0 else '#FF0000' for val in macd_histogram]
+        
         addplots = [
-            mpf.make_addplot(ema20, color='blue', width=1, label='EMA20'),
-            mpf.make_addplot(ema50, color='orange', width=1, label='EMA50')
+            mpf.make_addplot(ema20, color='blue', width=1.2),
+            mpf.make_addplot(ema50, color='orange', width=1.2),
+            
+            mpf.make_addplot(bb_upper, color='purple', width=0.8, linestyle='--'),
+            mpf.make_addplot(bb_middle, color='purple', width=0.5, linestyle=':'),
+            mpf.make_addplot(bb_lower, color='purple', width=0.8, linestyle='--'),
+            
+            mpf.make_addplot(fib_236, color='#FFD700', width=0.5, linestyle='-.'),
+            mpf.make_addplot(fib_382, color='#FFA500', width=0.5, linestyle='-.'),
+            mpf.make_addplot(fib_500, color='#FF6347', width=0.7, linestyle='-.'),
+            mpf.make_addplot(fib_618, color='#FF4500', width=0.5, linestyle='-.'),
+            
+            mpf.make_addplot(rsi, panel=2, color='#9C27B0', width=1.2, ylabel='RSI'),
+            mpf.make_addplot(rsi_overbought, panel=2, color='red', width=0.5, linestyle='--'),
+            mpf.make_addplot(rsi_oversold, panel=2, color='green', width=0.5, linestyle='--'),
+            
+            mpf.make_addplot(macd_line, panel=3, color='blue', width=1, ylabel='MACD'),
+            mpf.make_addplot(signal_line, panel=3, color='red', width=1),
+            mpf.make_addplot(macd_histogram, panel=3, type='bar', color=macd_colors, width=0.7),
         ]
 
         mpf.plot(
             df, type='candle', volume=True, style=style,
-            title=f"\n{symbol}/USDT ({tf}) - TradingView",
+            title=f"\n{symbol}/USDT ({tf}) - Technical Analysis",
             ylabel="Price (USDT)",
             ylabel_lower="Volume",
             savefig=dict(fname=filename, dpi=150, bbox_inches='tight'),
-            figratio=(16, 9),
-            figscale=1.3,
+            figratio=(16, 12),
+            figscale=1.5,
             tight_layout=True,
             addplot=addplots,
-            warn_too_much_data=500
+            warn_too_much_data=500,
+            panel_ratios=(6, 2, 2, 2)
         )
         
         logger.info(f"Chart berhasil disimpan: {filename}")
@@ -417,7 +498,16 @@ def analyze_image_with_gemini(image_path, symbol="BTC"):
     except Exception as e:
         return f"Error membaca file: {e}"
 
-    prompt = f"""Analisa chart candlestick {symbol}/USDT ({coin_info.get('name', symbol)}) ini secara teknikal. Berikan analisa dalam format berikut:
+    prompt = f"""Analisa chart candlestick {symbol}/USDT ({coin_info.get('name', symbol)}) ini secara teknikal. 
+
+Chart ini memiliki indikator:
+- EMA 20 (biru) dan EMA 50 (orange)
+- Bollinger Bands (ungu, garis putus-putus)
+- Fibonacci Retracement (garis kuning-orange)
+- RSI (panel bawah pertama, dengan garis overbought 70 dan oversold 30)
+- MACD (panel bawah kedua, dengan histogram hijau/merah)
+
+Berikan analisa dalam format berikut:
 
 SINYAL: [BUY/SELL/HOLD] - [Alasan singkat]
 ENTRY: [Harga entry yang disarankan]
@@ -425,9 +515,13 @@ TAKE PROFIT: [Target TP1] dan [Target TP2]
 STOP LOSS: [Harga SL yang disarankan]
 POLA: [Pola candlestick yang terlihat, misalnya: Bullish Engulfing, Doji, Hammer, dll]
 TREND: [Trend saat ini: Uptrend/Downtrend/Sideways]
+RSI: [Nilai RSI dan kondisi: Overbought/Oversold/Netral]
+MACD: [Kondisi MACD: Bullish Crossover/Bearish Crossover/Momentum positif/negatif]
+BOLLINGER: [Posisi harga terhadap Bollinger Bands: Upper/Middle/Lower band]
+FIBONACCI: [Level Fibonacci terdekat yang signifikan]
 SUPPORT: [Level support terdekat]
 RESISTANCE: [Level resistance terdekat]
-KESIMPULAN: [Ringkasan analisa dalam 1-2 kalimat]
+KESIMPULAN: [Ringkasan analisa dalam 2-3 kalimat berdasarkan semua indikator]
 
 Berikan angka spesifik berdasarkan chart yang terlihat. Jika tidak bisa menentukan harga exact, berikan estimasi range."""
 
@@ -510,6 +604,10 @@ def format_analysis_reply(text):
         {'keywords': ['stop loss', 'stoploss', 'sl', 'cut loss'], 'emoji': '🛑', 'group': 'trading'},
         {'keywords': ['pola', 'pattern', 'candlestick', 'candle'], 'emoji': '🕯️', 'group': 'analysis'},
         {'keywords': ['trend', 'arah'], 'emoji': '📈', 'group': 'analysis'},
+        {'keywords': ['rsi'], 'emoji': '📉', 'group': 'indicators'},
+        {'keywords': ['macd'], 'emoji': '📊', 'group': 'indicators'},
+        {'keywords': ['bollinger', 'bb'], 'emoji': '〰️', 'group': 'indicators'},
+        {'keywords': ['fibonacci', 'fib'], 'emoji': '🔢', 'group': 'indicators'},
         {'keywords': ['support', 'suport', 's1', 's2', 's3'], 'emoji': '🔻', 'group': 'levels'},
         {'keywords': ['resistance', 'resisten', 'r1', 'r2', 'r3'], 'emoji': '🔺', 'group': 'levels'},
         {'keywords': ['kesimpulan', 'conclusion', 'ringkasan', 'summary'], 'emoji': '🧠', 'group': 'conclusion'},
@@ -519,6 +617,7 @@ def format_analysis_reply(text):
         'signal': [],
         'trading': [],
         'analysis': [],
+        'indicators': [],
         'levels': [],
         'conclusion': [],
         'other': []
@@ -582,6 +681,12 @@ def format_analysis_reply(text):
             result_parts.append('')
         result_parts.append('─── Technical Analysis ───')
         result_parts.append('\n\n'.join(sections['analysis']))
+    
+    if sections['indicators']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Indicators ───')
+        result_parts.append('\n\n'.join(sections['indicators']))
     
     if sections['conclusion']:
         if result_parts:
