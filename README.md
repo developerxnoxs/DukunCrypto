@@ -172,10 +172,12 @@ pip install uv
 # Install dependencies
 uv sync
 
-# Run bots
+# Run bots (in separate terminals)
 uv run python src/btc_analyzer.py
 uv run python src/xau_analyzer.py
 ```
+
+> **Note**: Each bot must use a different Telegram token. Run each bot in a separate terminal or process to avoid polling conflicts.
 
 ### Deploy on Replit
 
