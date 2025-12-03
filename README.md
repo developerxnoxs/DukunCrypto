@@ -1,16 +1,16 @@
 <p align="center">
-  <h1 align="center">AI Trading Analysis Bots</h1>
+  <h1 align="center">Bot Analisa Teknikal Trading</h1>
   <p align="center">
-    <strong>AI-Powered Technical Analysis for Crypto & Forex Markets</strong>
+    <strong>Analisa Teknikal Berbasis AI untuk Pasar Crypto & Forex</strong>
   </p>
   <p align="center">
-    Telegram bots that generate professional candlestick charts with technical indicators<br>
-    and provide AI-powered trading insights using Google Gemini Vision
+    Bot Telegram yang menghasilkan chart candlestick profesional dengan indikator teknikal<br>
+    dan memberikan insight trading menggunakan Google Gemini Vision
   </p>
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/Lisensi-MIT-blue.svg" alt="Lisensi"></a>
   <a href="#"><img src="https://img.shields.io/badge/Python-3.11+-green.svg" alt="Python"></a>
   <a href="#"><img src="https://img.shields.io/badge/Telegram-Bot%20API-blue.svg" alt="Telegram"></a>
   <a href="#"><img src="https://img.shields.io/badge/AI-Gemini%20Vision-orange.svg" alt="Gemini"></a>
@@ -18,74 +18,74 @@
 </p>
 
 <p align="center">
-  <a href="#features">Features</a> •
-  <a href="#technical-indicators">Indicators</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#usage">Usage</a> •
-  <a href="#configuration">Configuration</a> •
-  <a href="#contributing">Contributing</a>
+  <a href="#fitur">Fitur</a> •
+  <a href="#indikator-teknikal">Indikator</a> •
+  <a href="#instalasi">Instalasi</a> •
+  <a href="#penggunaan">Penggunaan</a> •
+  <a href="#konfigurasi">Konfigurasi</a> •
+  <a href="#kontribusi">Kontribusi</a>
 </p>
 
 ---
 
-## Overview
+## Ringkasan
 
-This project provides two specialized Telegram bots for real-time market analysis:
+Bot Telegram terpadu untuk analisa pasar real-time:
 
-| Bot | Markets | Assets | Timeframes |
-|-----|---------|--------|------------|
-| **BTC Analyzer** | Cryptocurrency | 14 coins | 8 timeframes |
-| **Forex Analyzer** | Forex & Commodities | 16 pairs | 7 timeframes |
+| Pasar | Aset | Timeframe |
+|-------|------|-----------|
+| **Cryptocurrency** | 14 koin | 8 timeframe |
+| **Forex & Komoditas** | 16 pasangan | 7 timeframe |
 
-Both bots leverage **Google Gemini Vision API** to analyze candlestick charts and provide natural language trading insights, pattern recognition, and actionable signals.
+Bot ini menggunakan **Google Gemini Vision API** untuk menganalisa chart candlestick dan memberikan insight trading dalam bahasa natural, pengenalan pola, dan sinyal yang dapat ditindaklanjuti.
 
-## Features
+## Fitur
 
-### Multi-Panel Professional Charts
+### Chart Profesional Multi-Panel
 
-Each analysis generates a comprehensive 4-panel chart:
+Setiap analisa menghasilkan chart 4-panel yang komprehensif:
 
 ```
 ┌─────────────────────────────────────────┐
-│  Candlestick + EMA + Bollinger + Fib    │  Panel 1: Price Action
+│  Candlestick + EMA + Bollinger + Fib    │  Panel 1: Aksi Harga
 ├─────────────────────────────────────────┤
-│            Volume Bars                   │  Panel 2: Volume
+│            Bar Volume                    │  Panel 2: Volume
 ├─────────────────────────────────────────┤
-│     RSI (14) with 70/30 levels          │  Panel 3: RSI
+│     RSI (14) dengan level 70/30         │  Panel 3: RSI
 ├─────────────────────────────────────────┤
 │   MACD + Signal + Histogram             │  Panel 4: MACD
 └─────────────────────────────────────────┘
 ```
 
-### Technical Indicators
+### Indikator Teknikal
 
-| Indicator | Parameters | Description |
-|-----------|------------|-------------|
-| **EMA** | 20, 50 periods | Exponential Moving Averages for trend direction |
-| **Bollinger Bands** | 20 periods, 2σ | Volatility bands with upper/middle/lower |
-| **RSI** | 14 periods | Relative Strength Index with overbought (70) / oversold (30) |
-| **MACD** | 12/26/9 | Moving Average Convergence Divergence with histogram |
-| **Fibonacci** | Auto | Retracement levels: 23.6%, 38.2%, 50%, 61.8% |
+| Indikator | Parameter | Deskripsi |
+|-----------|-----------|-----------|
+| **EMA** | 20, 50 periode | Exponential Moving Average untuk arah tren |
+| **Bollinger Bands** | 20 periode, 2σ | Band volatilitas dengan upper/middle/lower |
+| **RSI** | 14 periode | Relative Strength Index dengan overbought (70) / oversold (30) |
+| **MACD** | 12/26/9 | Moving Average Convergence Divergence dengan histogram |
+| **Fibonacci** | Otomatis | Level retracement: 23.6%, 38.2%, 50%, 61.8% |
 
-### AI-Powered Analysis
+### Analisa Berbasis AI
 
-The Gemini Vision API analyzes charts to provide:
+Gemini Vision API menganalisa chart untuk memberikan:
 
-- **Trading Signal**: BUY / SELL / HOLD with confidence level
-- **Entry Point**: Suggested entry price
-- **Take Profit**: TP1 and TP2 targets
-- **Stop Loss**: Risk management level
-- **Pattern Recognition**: Candlestick and chart patterns
-- **Trend Analysis**: Current market direction
-- **Support/Resistance**: Key price levels
-- **Summary**: Actionable trading insights
+- **Sinyal Trading**: BELI / JUAL / TAHAN dengan tingkat kepercayaan
+- **Harga Masuk**: Saran harga entry
+- **Target Profit**: Target TP1 dan TP2
+- **Stop Loss**: Level manajemen risiko
+- **Pengenalan Pola**: Pola candlestick dan chart
+- **Analisa Tren**: Arah pasar saat ini
+- **Support/Resistance**: Level harga penting
+- **Kesimpulan**: Insight trading yang actionable
 
-### Supported Markets
+### Pasar yang Didukung
 
 <details>
-<summary><strong>BTC Analyzer - 14 Cryptocurrencies</strong></summary>
+<summary><strong>Cryptocurrency - 14 Koin</strong></summary>
 
-| Symbol | Name | Symbol | Name |
+| Simbol | Nama | Simbol | Nama |
 |--------|------|--------|------|
 | BTC | Bitcoin | LINK | Chainlink |
 | ETH | Ethereum | DOT | Polkadot |
@@ -95,217 +95,224 @@ The Gemini Vision API analyzes charts to provide:
 | ADA | Cardano | AVAX | Avalanche |
 | DOGE | Dogecoin | MATIC | Polygon |
 
-**Timeframes**: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w
+**Timeframe**: 1m, 5m, 15m, 30m, 1j, 4j, 1h, 1mg
 
 </details>
 
 <details>
-<summary><strong>Forex Analyzer - 16 Pairs & Commodities</strong></summary>
+<summary><strong>Forex & Komoditas - 16 Pasangan</strong></summary>
 
-**Commodities**
-| Symbol | Name |
+**Komoditas**
+| Simbol | Nama |
 |--------|------|
-| XAUUSD | Gold |
-| XAGUSD | Silver |
-| USOIL | Crude Oil |
+| XAUUSD | Emas |
+| XAGUSD | Perak |
+| USOIL | Minyak Mentah |
 
-**Major Pairs**
-| Symbol | Pair |
-|--------|------|
-| EURUSD | Euro / US Dollar |
-| GBPUSD | British Pound / US Dollar |
-| USDJPY | US Dollar / Japanese Yen |
-| USDCHF | US Dollar / Swiss Franc |
-| AUDUSD | Australian Dollar / US Dollar |
-| USDCAD | US Dollar / Canadian Dollar |
-| NZDUSD | New Zealand Dollar / US Dollar |
+**Pasangan Utama**
+| Simbol | Pasangan |
+|--------|----------|
+| EURUSD | Euro / Dolar AS |
+| GBPUSD | Poundsterling / Dolar AS |
+| USDJPY | Dolar AS / Yen Jepang |
+| USDCHF | Dolar AS / Franc Swiss |
+| AUDUSD | Dolar Australia / Dolar AS |
+| USDCAD | Dolar AS / Dolar Kanada |
+| NZDUSD | Dolar Selandia Baru / Dolar AS |
 
-**Cross Pairs**
-| Symbol | Pair |
-|--------|------|
-| EURGBP | Euro / British Pound |
-| EURJPY | Euro / Japanese Yen |
-| GBPJPY | British Pound / Japanese Yen |
-| AUDJPY | Australian Dollar / Japanese Yen |
-| EURAUD | Euro / Australian Dollar |
-| EURCHF | Euro / Swiss Franc |
+**Pasangan Silang**
+| Simbol | Pasangan |
+|--------|----------|
+| EURGBP | Euro / Poundsterling |
+| EURJPY | Euro / Yen Jepang |
+| GBPJPY | Poundsterling / Yen Jepang |
+| AUDJPY | Dolar Australia / Yen Jepang |
+| EURAUD | Euro / Dolar Australia |
+| EURCHF | Euro / Franc Swiss |
 
-**Timeframes**: 1m, 5m, 15m, 30m, 1h, 4h, 1d
+**Timeframe**: 1m, 5m, 15m, 30m, 1j, 4j, 1h
 
 </details>
 
-## Installation
+## Instalasi
 
-### Prerequisites
+### Prasyarat
 
-- Python 3.11 or higher
-- Telegram Bot Token (from [@BotFather](https://t.me/BotFather))
-- Google Gemini API Key (from [Google AI Studio](https://aistudio.google.com/app/apikey))
+- Python 3.11 atau lebih tinggi
+- Token Bot Telegram (dari [@BotFather](https://t.me/BotFather))
+- Google Gemini API Key (dari [Google AI Studio](https://aistudio.google.com/app/apikey))
 
-### Quick Start
+### Mulai Cepat
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/yourusername/ai-trading-analysis-bots.git
 cd ai-trading-analysis-bots
 
 # Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables
+# Konfigurasi environment variables
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env dengan API key Anda
 
-# Run BTC Analyzer Bot
-python src/btc_analyzer.py
-
-# Run Forex Analyzer Bot (in separate terminal)
-python src/xau_analyzer.py
+# Jalankan bot
+python main.py
 ```
 
-### Using UV (Recommended)
+### Menggunakan UV (Direkomendasikan)
 
 ```bash
-# Install UV if not already installed
+# Install UV jika belum ada
 pip install uv
 
 # Install dependencies
 uv sync
 
-# Run bots (in separate terminals)
-uv run python src/btc_analyzer.py
-uv run python src/xau_analyzer.py
+# Jalankan bot
+uv run python main.py
 ```
 
-> **Note**: Each bot must use a different Telegram token. Run each bot in a separate terminal or process to avoid polling conflicts.
-
-### Deploy on Replit
+### Deploy di Replit
 
 [![Run on Replit](https://replit.com/badge/github/yourusername/ai-trading-analysis-bots)](https://replit.com/github/yourusername/ai-trading-analysis-bots)
 
-1. Fork this repository on Replit
-2. Add your API keys in the Secrets tab
-3. Run the workflows
+1. Fork repository ini di Replit
+2. Tambahkan API key di tab Secrets
+3. Jalankan workflow
 
-## Configuration
+## Konfigurasi
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `TELEGRAM_BOT_TOKEN` | BTC Analyzer bot token from BotFather | Yes |
-| `TELEGRAM_BOT_TOKEN_XAU` | Forex Analyzer bot token from BotFather | Yes |
-| `GEMINI_API_KEY` | Google Gemini API key | Yes |
+Bot mengambil konfigurasi dari file `.env` atau environment variables.
 
-### Getting API Keys
+| Variabel | Deskripsi | Wajib |
+|----------|-----------|-------|
+| `TELEGRAM_BOT_TOKEN` | Token bot dari BotFather | Ya |
+| `GEMINI_API_KEY` | Google Gemini API key | Ya |
+
+### Cara Mendapatkan API Key
 
 <details>
-<summary><strong>Telegram Bot Token</strong></summary>
+<summary><strong>Token Bot Telegram</strong></summary>
 
-1. Open Telegram and search for [@BotFather](https://t.me/BotFather)
-2. Send `/newbot` command
-3. Follow the prompts to create your bot
-4. Copy the token provided
+1. Buka Telegram dan cari [@BotFather](https://t.me/BotFather)
+2. Kirim perintah `/newbot`
+3. Ikuti petunjuk untuk membuat bot Anda
+4. Salin token yang diberikan
 
 </details>
 
 <details>
 <summary><strong>Google Gemini API Key</strong></summary>
 
-1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy the generated key
+1. Kunjungi [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. Masuk dengan akun Google Anda
+3. Klik "Create API Key"
+4. Salin key yang dihasilkan
 
 </details>
 
-## Usage
+### Contoh File .env
 
-### Bot Commands
+```env
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGhIjKlMnOpQrStUvWxYz
+GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+## Penggunaan
+
+### Perintah Bot
+
+| Perintah | Deskripsi |
+|----------|-----------|
+| `/start` | Mulai bot dan tampilkan menu utama |
+| `/analyze <simbol> <tf>` | Analisa langsung (contoh: `/analyze BTC 15min`) |
+| `/price <simbol>` | Lihat harga terkini |
+| `/help` | Tampilkan panduan penggunaan |
+
+### Cara Kerja
+
+1. **Mulai** bot dengan perintah `/start`
+2. **Pilih** pasar (Cryptocurrency atau Forex)
+3. **Pilih** aset yang ingin dianalisa
+4. **Pilih** timeframe yang diinginkan
+5. **Terima** chart profesional dengan analisa AI
+
+### Output Analisa
+
+Bot memberikan analisa terstruktur meliputi:
 
 ```
-/start - Start the bot and show main menu
-```
+📊 HASIL ANALISA [SIMBOL] - [TIMEFRAME]
 
-### How It Works
+📈 SINYAL: BELI/JUAL/TAHAN
+   Alasan: [Penjelasan AI]
 
-1. **Start** the bot with `/start` command
-2. **Select** a cryptocurrency or forex pair
-3. **Choose** your preferred timeframe
-4. **Receive** a professional chart with AI analysis
-
-### Analysis Output
-
-The bot provides structured analysis including:
-
-```
-📊 ANALISIS TEKNIKAL [SYMBOL] - [TIMEFRAME]
-
-📈 SINYAL: BUY/SELL/HOLD
-   Alasan: [AI reasoning]
-
-💰 ENTRY: $XX,XXX
-📈 TAKE PROFIT 1: $XX,XXX
-📈 TAKE PROFIT 2: $XX,XXX
+💰 HARGA MASUK: $XX,XXX
+📈 TARGET PROFIT 1: $XX,XXX
+📈 TARGET PROFIT 2: $XX,XXX
 🛑 STOP LOSS: $XX,XXX
 
-🕯️ POLA: [Candlestick patterns]
-📊 TREND: [Market trend]
+🕯️ POLA: [Pola candlestick]
+📊 TREN: [Tren pasar]
 📍 SUPPORT: $XX,XXX
 📍 RESISTANCE: $XX,XXX
 
-💡 KESIMPULAN: [Summary]
+💡 KESIMPULAN: [Ringkasan]
 ```
 
-## Project Structure
+## Struktur Proyek
 
 ```
 ai-trading-analysis-bots/
+├── main.py                  # Bot utama (Crypto + Forex)
 ├── src/
-│   ├── __init__.py           # Package initialization
-│   ├── btc_analyzer.py       # Cryptocurrency analysis bot
-│   └── xau_analyzer.py       # Forex & commodities bot
-├── docs/                     # Documentation
-├── assets/                   # Images and screenshots
-├── examples/                 # Usage examples
-├── tests/                    # Test suite
-├── .env.example              # Environment template
-├── .gitignore               # Git ignore rules
-├── CHANGELOG.md             # Version history
-├── CODE_OF_CONDUCT.md       # Community guidelines
-├── CONTRIBUTING.md          # Contribution guide
-├── LICENSE                  # MIT License
-├── README.md                # This file
-├── pyproject.toml           # Project configuration
-└── requirements.txt         # Dependencies
+│   ├── __init__.py          # Inisialisasi package
+│   ├── btc_analyzer.py      # [DEPRECATED] Gunakan main.py
+│   └── xau_analyzer.py      # [DEPRECATED] Gunakan main.py
+├── docs/                    # Dokumentasi
+├── assets/                  # Gambar dan screenshot
+├── examples/                # Contoh penggunaan
+├── .env.example             # Template environment
+├── .gitignore              # Aturan git ignore
+├── CHANGELOG.md            # Riwayat versi
+├── CODE_OF_CONDUCT.md      # Panduan komunitas
+├── CONTRIBUTING.md         # Panduan kontribusi
+├── LICENSE                 # Lisensi MIT
+├── README.md               # File ini
+├── pyproject.toml          # Konfigurasi proyek
+├── replit.md               # Dokumentasi Replit
+└── requirements.txt        # Dependencies
 ```
 
-## Data Sources
+## Sumber Data
 
-The bots use multiple data sources with automatic fallback:
+Bot menggunakan beberapa sumber data dengan fallback otomatis:
 
-| Priority | Source | Type | Coverage |
-|----------|--------|------|----------|
-| 1 | TradingView | Primary | All markets |
-| 2 | Yahoo Finance | Fallback | Forex, Crypto |
-| 3 | KuCoin API | Fallback | Crypto only |
+| Prioritas | Sumber | Tipe | Cakupan |
+|-----------|--------|------|---------|
+| 1 | TradingView | Utama | Semua pasar |
+| 2 | Yahoo Finance | Cadangan | Forex, Crypto |
+| 3 | KuCoin API | Cadangan | Crypto saja |
 
-This multi-source architecture ensures high availability and minimizes downtime.
+Arsitektur multi-sumber ini memastikan ketersediaan tinggi dan meminimalkan downtime.
 
-## Contributing
+## Kontribusi
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md) before submitting a PR.
+Kontribusi sangat diterima! Silakan baca [Panduan Kontribusi](CONTRIBUTING.md) dan [Kode Etik](CODE_OF_CONDUCT.md) sebelum mengirim PR.
 
-### Development Setup
+### Setup Development
 
 ```bash
 # Install dev dependencies
 pip install -e ".[dev]"
 
-# Run tests
+# Jalankan tests
 pytest
 
-# Format code
+# Format kode
 black src/
 isort src/
 
@@ -313,32 +320,32 @@ isort src/
 ruff check src/
 ```
 
-## Disclaimer
+## Peringatan
 
-**This software is for educational and informational purposes only.**
+**Software ini hanya untuk tujuan edukasi dan informasi.**
 
-- Not financial advice
-- Do your own research before trading
-- Past performance does not guarantee future results
-- Trading cryptocurrencies and forex carries significant risk
+- Bukan saran keuangan
+- Lakukan riset sendiri sebelum trading
+- Kinerja masa lalu tidak menjamin hasil di masa depan
+- Trading cryptocurrency dan forex memiliki risiko signifikan
 
-## License
+## Lisensi
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Proyek ini dilisensikan di bawah Lisensi MIT - lihat file [LICENSE](LICENSE) untuk detail.
 
-## Acknowledgments
+## Pengakuan
 
-- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) - Telegram Bot API wrapper
-- [mplfinance](https://github.com/matplotlib/mplfinance) - Financial charting library
-- [Google Gemini](https://ai.google.dev/) - AI vision analysis
-- [TradingView](https://tradingview.com/) - Market data
+- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) - Wrapper Telegram Bot API
+- [mplfinance](https://github.com/matplotlib/mplfinance) - Library charting keuangan
+- [Google Gemini](https://ai.google.dev/) - Analisa AI vision
+- [TradingView](https://tradingview.com/) - Data pasar
 
 ---
 
 <p align="center">
-  Made with ❤️ for traders
+  Dibuat dengan ❤️ untuk para trader
 </p>
 
 <p align="center">
-  <a href="#ai-trading-analysis-bots">Back to top</a>
+  <a href="#bot-analisa-teknikal-trading">Kembali ke atas</a>
 </p>
