@@ -20,6 +20,9 @@ Semua output dalam **Bahasa Indonesia**.
 ```
 ai-trading-analysis-bots/
 ├── main.py                  # Bot utama (gabungan crypto + forex)
+├── setup.sh                 # Script setup otomatis (Linux/macOS)
+├── setup.py                 # Script setup cross-platform (Python)
+├── setup_termux.sh          # Script setup khusus Termux (Android)
 ├── src/
 │   ├── __init__.py          # Package initialization
 │   ├── btc_analyzer.py      # [DEPRECATED] Gunakan main.py
@@ -96,8 +99,40 @@ GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Rekomendasi harga masuk, target profit, stop loss
 - Output dalam Bahasa Indonesia
 
+## Setup Multi-Platform
+
+Bot ini mendukung berbagai lingkungan:
+
+| Platform | Script Setup | Catatan |
+|----------|--------------|---------|
+| Linux | `./setup.sh` atau `python setup.py` | Instalasi standar |
+| macOS | `./setup.sh` atau `python setup.py` | Instalasi standar |
+| Windows | `python setup.py` | Gunakan Python script |
+| Termux (Android) | `./setup_termux.sh` | Memerlukan langkah khusus |
+| Replit | Otomatis | Secrets via GUI |
+
+### Setup Termux (Android)
+
+Termux memerlukan langkah khusus karena keterbatasan kompilasi:
+
+```bash
+# Jalankan script otomatis
+chmod +x setup_termux.sh
+./setup_termux.sh
+
+# Atau manual:
+export CFLAGS="-Wno-implicit-function-declaration"
+export MATHLIB="m"
+pkg install ninja automake cmake binutils patchelf
+pip install meson meson-python pybind11
+pip install --no-build-isolation contourpy
+pkg install matplotlib
+pip install -r requirements.txt
+```
+
 ## Perubahan Terbaru
 
+- 2024-12-03: Menambahkan script setup multi-platform (setup.sh, setup.py, setup_termux.sh)
 - 2024-12-03: Menggabungkan btc_analyzer dan xau_analyzer menjadi main.py
 - 2024-12-03: Menambahkan menu pilihan pasar (crypto/forex)
 - 2024-12-03: Mengubah semua output ke Bahasa Indonesia

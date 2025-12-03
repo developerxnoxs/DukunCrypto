@@ -142,7 +142,69 @@ Gemini Vision API menganalisa chart untuk memberikan:
 - Token Bot Telegram (dari [@BotFather](https://t.me/BotFather))
 - Google Gemini API Key (dari [Google AI Studio](https://aistudio.google.com/app/apikey))
 
-### Mulai Cepat
+### Mulai Cepat (Otomatis)
+
+Gunakan script setup otomatis yang mendeteksi lingkungan Anda:
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/ai-trading-analysis-bots.git
+cd ai-trading-analysis-bots
+
+# Jalankan setup otomatis (Linux/macOS)
+chmod +x setup.sh
+./setup.sh
+
+# Atau menggunakan Python (semua platform)
+python setup.py
+
+# Edit .env dengan API key Anda
+nano .env  # atau editor lainnya
+
+# Jalankan bot
+python main.py
+```
+
+### Instalasi di Termux (Android)
+
+Termux memerlukan langkah khusus karena keterbatasan kompilasi:
+
+```bash
+# Clone repository
+git clone https://github.com/yourusername/ai-trading-analysis-bots.git
+cd ai-trading-analysis-bots
+
+# Jalankan script setup Termux
+chmod +x setup_termux.sh
+./setup_termux.sh
+
+# Atau manual:
+# 1. Set variabel environment
+export CFLAGS="-Wno-implicit-function-declaration"
+export MATHLIB="m"
+
+# 2. Install dependensi build
+pkg update && pkg upgrade
+pkg install python python-pip git
+pkg install ninja automake cmake binutils patchelf
+pip install meson meson-python pybind11
+
+# 3. Install contourpy tanpa build isolation
+pip install --no-build-isolation contourpy
+
+# 4. Install matplotlib dari pkg
+pkg install matplotlib
+
+# 5. Install sisa dependensi
+pip install -r requirements.txt
+
+# 6. Konfigurasi dan jalankan
+cp .env.example .env
+nano .env  # masukkan API key
+python main.py
+```
+
+### Instalasi Manual (Linux/macOS/Windows)
 
 ```bash
 # Clone repository
