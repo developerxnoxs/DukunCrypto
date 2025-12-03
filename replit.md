@@ -1,86 +1,94 @@
-# AI Trading Analysis Bots
+# Bot Analisa Teknikal Trading
 
-## Overview
+## Ringkasan
 
-This project is a dual Telegram bot system that provides AI-powered technical analysis for cryptocurrency and forex/commodity markets. The system uses Google Gemini Vision API to analyze candlestick charts with technical indicators, delivering insights directly to users through Telegram conversations.
+Proyek ini adalah bot Telegram yang menyediakan analisa teknikal berbasis AI untuk pasar cryptocurrency dan forex/komoditas. Sistem menggunakan Google Gemini Vision API untuk menganalisa chart candlestick dengan indikator teknikal, memberikan insight langsung ke pengguna melalui Telegram.
 
-**BTC Analyzer Bot** supports 14 major cryptocurrencies (BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, MATIC, LINK, DOT, ATOM, UNI, LTC) across 8 timeframes.
+Bot mendukung:
+- **Cryptocurrency**: 14 koin populer (BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, MATIC, LINK, DOT, ATOM, UNI, LTC)
+- **Forex & Komoditas**: 16 pasangan (XAUUSD, XAGUSD, USOIL, EUR/USD, GBP/USD, dan lainnya)
 
-**Forex Analyzer Bot** covers 16 forex pairs and commodities including gold (XAUUSD), silver (XAGUSD), oil (USOIL), and major/cross currency pairs across 7 timeframes.
+Semua output dalam **Bahasa Indonesia**.
 
-Both bots fetch real-time market data, generate visual charts with technical indicators, and leverage Gemini Vision to provide natural language technical analysis.
+## Preferensi Pengguna
 
-## User Preferences
+- Gaya komunikasi: Bahasa sehari-hari yang sederhana
+- Bahasa: Indonesia (Bahasa Indonesia)
 
-- Preferred communication style: Simple, everyday language
-- Language: Indonesian (Bahasa Indonesia) for bot responses
-
-## Project Structure
+## Struktur Proyek
 
 ```
 ai-trading-analysis-bots/
+├── main.py                  # Bot utama (gabungan crypto + forex)
 ├── src/
-│   ├── __init__.py           # Package initialization
-│   ├── btc_analyzer.py       # Cryptocurrency analysis bot
-│   └── xau_analyzer.py       # Forex & commodities bot
+│   ├── __init__.py          # Package initialization
+│   ├── btc_analyzer.py      # [DEPRECATED] Gunakan main.py
+│   └── xau_analyzer.py      # [DEPRECATED] Gunakan main.py
 ├── docs/
-│   ├── API.md                # API documentation
+│   ├── API.md               # Dokumentasi API
 │   └── TECHNICAL_INDICATORS.md
-├── assets/                   # Images and screenshots
-├── examples/                 # Usage examples
-├── .env.example              # Environment template
-├── .gitignore               # Git ignore rules
-├── CHANGELOG.md             # Version history
-├── CODE_OF_CONDUCT.md       # Community guidelines
-├── CONTRIBUTING.md          # Contribution guide
+├── assets/                  # Gambar dan screenshots
+├── examples/                # Contoh penggunaan
+├── CHANGELOG.md             # Riwayat versi
+├── CODE_OF_CONDUCT.md       # Panduan komunitas
+├── CONTRIBUTING.md          # Panduan kontribusi
 ├── LICENSE                  # MIT License
-├── README.md                # Main documentation
-├── main.py                  # Entry point
-├── pyproject.toml           # Project configuration
+├── README.md                # Dokumentasi utama
+├── pyproject.toml           # Konfigurasi proyek
 ├── requirements.txt         # Dependencies
-└── replit.md                # This file
+└── replit.md                # File ini
 ```
 
-## Technical Indicators
+## Indikator Teknikal
 
-- **EMA20 and EMA50**: Exponential Moving Averages (price overlay)
+- **EMA20 dan EMA50**: Exponential Moving Averages (overlay harga)
 - **Bollinger Bands**: 20-period, 2 standard deviations
-- **Fibonacci Retracement**: Auto-calculated levels (23.6%, 38.2%, 50%, 61.8%)
-- **RSI**: 14-period with overbought (70) / oversold (30) lines
-- **MACD**: 12/26/9 with signal line and histogram
+- **Fibonacci Retracement**: Level otomatis (23.6%, 38.2%, 50%, 61.8%)
+- **RSI**: 14-period dengan garis overbought (70) / oversold (30)
+- **MACD**: 12/26/9 dengan signal line dan histogram
 
-## Chart Layout
+## Layout Chart
 
-4-panel professional layout with ratio 6:2:2:2:
+Layout profesional 4-panel dengan rasio 6:2:2:2:
 1. Candlestick + EMA + Bollinger + Fibonacci
 2. Volume bars
-3. RSI indicator
-4. MACD indicator
+3. Indikator RSI
+4. Indikator MACD
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `TELEGRAM_BOT_TOKEN` | BTC Analyzer bot token |
-| `TELEGRAM_BOT_TOKEN_XAU` | Forex Analyzer bot token |
+| Variable | Deskripsi |
+|----------|-----------|
+| `TELEGRAM_BOT_TOKEN` | Token bot Telegram |
 | `GEMINI_API_KEY` | Google Gemini API key |
 
-## Workflows
+## Workflow
 
-| Name | Command | Description |
-|------|---------|-------------|
-| BTC Analyzer Bot | `uv run python src/btc_analyzer.py` | Crypto analysis |
-| Forex Analyzer Bot | `uv run python src/xau_analyzer.py` | Forex analysis |
+| Nama | Perintah | Deskripsi |
+|------|----------|-----------|
+| Trading Analysis Bot | `uv run python main.py` | Bot analisa crypto & forex |
 
-## Data Sources
+## Sumber Data
 
-1. **TradingView** (primary) - via xnoxs_fetcher
-2. **Yahoo Finance** (fallback) - via yfinance
-3. **KuCoin API** (crypto fallback) - direct REST
+1. **TradingView** (utama) - via xnoxs_fetcher
+2. **Yahoo Finance** (cadangan) - via yfinance
+3. **KuCoin API** (cadangan crypto) - REST API langsung
 
-## Recent Changes
+## Fitur Bot
 
-- 2024-12-02: Added RSI, MACD, Bollinger Bands, Fibonacci indicators
-- 2024-12-02: Reorganized project structure for GitHub
-- 2024-12-02: Added comprehensive documentation
-- 2024-12-02: Created LICENSE, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+- Menu pilihan pasar (Cryptocurrency / Forex)
+- Pilihan timeframe interaktif
+- Chart candlestick dengan indikator lengkap
+- Analisa AI dengan Gemini Vision
+- Sinyal BELI/JUAL/TAHAN
+- Rekomendasi harga masuk, target profit, stop loss
+- Output dalam Bahasa Indonesia
+
+## Perubahan Terbaru
+
+- 2024-12-03: Menggabungkan btc_analyzer dan xau_analyzer menjadi main.py
+- 2024-12-03: Menambahkan menu pilihan pasar (crypto/forex)
+- 2024-12-03: Mengubah semua output ke Bahasa Indonesia
+- 2024-12-02: Menambahkan indikator RSI, MACD, Bollinger Bands, Fibonacci
+- 2024-12-02: Reorganisasi struktur proyek untuk GitHub
+- 2024-12-02: Menambahkan dokumentasi lengkap

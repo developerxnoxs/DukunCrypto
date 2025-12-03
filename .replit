@@ -17,39 +17,15 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "BTC Analyzer Bot"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Forex Analyzer Bot"
+args = "Trading Analysis Bot"
 
 [[workflows.workflow]]
-name = "BTC Analyzer Bot"
+name = "Trading Analysis Bot"
 author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uv run python main.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "uv run python src/btc_analyzer.py"
-
-[[workflows.workflow]]
-name = "Forex Analyzer Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "uv run python src/xau_analyzer.py"
-
-[[workflows.workflow]]
-name = "combine"
-mode = "sequential"
-author = 50543629
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "uv run python combined_analyzer.py"
