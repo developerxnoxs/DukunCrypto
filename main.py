@@ -23,6 +23,106 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+class Colors:
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    
+    BG_RED = '\033[41m'
+    BG_GREEN = '\033[42m'
+    BG_BLUE = '\033[44m'
+
+
+class ColoredFormatter(logging.Formatter):
+    FORMATS = {
+        logging.DEBUG: f"{Colors.DIM}%(message)s{Colors.RESET}",
+        logging.INFO: f"{Colors.CYAN}%(message)s{Colors.RESET}",
+        logging.WARNING: f"{Colors.YELLOW}%(message)s{Colors.RESET}",
+        logging.ERROR: f"{Colors.RED}{Colors.BOLD}%(message)s{Colors.RESET}",
+        logging.CRITICAL: f"{Colors.BG_RED}{Colors.WHITE}{Colors.BOLD}%(message)s{Colors.RESET}",
+    }
+
+    def format(self, record):
+        log_fmt = self.FORMATS.get(record.levelno, "%(message)s")
+        formatter = logging.Formatter(log_fmt)
+        return formatter.format(record)
+
+
+class QuietFilter(logging.Filter):
+    def filter(self, record):
+        noisy_messages = [
+            'HTTP Request',
+            'httpx',
+            'httpcore',
+            'urllib3',
+            'Retrying',
+            'Starting new HTTP',
+        ]
+        return not any(msg in record.getMessage() for msg in noisy_messages)
+
+
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('telegram').setLevel(logging.WARNING)
+logging.getLogger('yfinance').setLevel(logging.WARNING)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(ColoredFormatter())
+console_handler.addFilter(QuietFilter())
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+logger.handlers = []
+logger.addHandler(console_handler)
+logger.propagate = False
+
+
+def print_banner():
+    banner = f"""
+{Colors.CYAN}{Colors.BOLD}╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║   {Colors.YELLOW}📊 BOT ANALISA TEKNIKAL TRADING{Colors.CYAN}                        ║
+║   {Colors.WHITE}Crypto & Forex Analysis with AI{Colors.CYAN}                        ║
+║                                                          ║
+╚══════════════════════════════════════════════════════════╝{Colors.RESET}
+"""
+    print(banner)
+
+
+def log_success(message):
+    print(f"{Colors.GREEN}  ✓ {message}{Colors.RESET}")
+
+
+def log_warning(message):
+    print(f"{Colors.YELLOW}  ⚠ {message}{Colors.RESET}")
+
+
+def log_error(message):
+    print(f"{Colors.RED}  ✗ {message}{Colors.RESET}")
+
+
+def log_info(message):
+    print(f"{Colors.CYAN}  ℹ {message}{Colors.RESET}")
+
+
+def log_data(message):
+    print(f"{Colors.MAGENTA}  📡 {message}{Colors.RESET}")
+
+
+def log_analysis(message):
+    print(f"{Colors.BLUE}  🤖 {message}{Colors.RESET}")
+
+
 try:
     from xnoxs_fetcher import XnoxsFetcher, TimeFrame
     fetcher = XnoxsFetcher()
@@ -55,12 +155,6 @@ try:
     import yfinance as yf
 except ImportError:
     yf = None
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -119,15 +213,12 @@ def fetch_crypto_from_tradingview(symbol="BTC", interval="1hour", n_bars=200):
     """Mengambil data candlestick Crypto dari TradingView"""
     
     if not TV_AVAILABLE:
-        logger.error("Pustaka xnoxs-fetcher tidak tersedia")
         return None
     
     if interval not in TV_INTERVAL_MAP:
-        logger.error(f"Interval tidak valid untuk TradingView: {interval}")
         return None
     
     if symbol not in SUPPORTED_COINS:
-        logger.error(f"Simbol tidak valid: {symbol}")
         return None
     
     tv_interval = TV_INTERVAL_MAP[interval]
@@ -137,8 +228,6 @@ def fetch_crypto_from_tradingview(symbol="BTC", interval="1hour", n_bars=200):
     
     for exchange in exchanges:
         try:
-            logger.info(f"Mencoba mengambil data {tv_symbol} dari TradingView ({exchange}) interval {interval}...")
-            
             df = fetcher.get_historical_data(
                 symbol=tv_symbol,
                 exchange=exchange,
@@ -162,14 +251,12 @@ def fetch_crypto_from_tradingview(symbol="BTC", interval="1hour", n_bars=200):
                         float(row["volume"]) if "volume" in row else 0
                     ])
                 
-                logger.info(f"Berhasil mengambil {len(candles)} candle {tv_symbol} dari TradingView ({exchange})")
+                log_data(f"{symbol} ({interval}): {len(candles)} candle dari TradingView")
                 return candles
                 
-        except Exception as e:
-            logger.warning(f"Gagal dari {exchange}: {e}")
+        except Exception:
             continue
     
-    logger.error(f"Gagal mengambil data {tv_symbol} dari semua exchange TradingView")
     return None
 
 
@@ -177,21 +264,16 @@ def fetch_crypto_from_yfinance(symbol="BTC", interval="1hour"):
     """Mengambil data candlestick Crypto dari Yahoo Finance (cadangan)"""
     
     if not yf:
-        logger.error("Pustaka yfinance tidak tersedia")
         return None
     
     if interval not in INTERVAL_MAP:
-        logger.error(f"Interval tidak valid: {interval}")
         return None
     
     if symbol not in SUPPORTED_COINS:
-        logger.error(f"Simbol tidak valid: {symbol}")
         return None
 
     try:
         yf_symbol = SUPPORTED_COINS[symbol]["yf_symbol"]
-        logger.info(f"Mengambil data {symbol} dari Yahoo Finance ({yf_symbol}) interval {interval}...")
-        
         yf_interval = INTERVAL_MAP[interval]
         ticker = yf.Ticker(yf_symbol)
         
@@ -203,12 +285,10 @@ def fetch_crypto_from_yfinance(symbol="BTC", interval="1hour"):
         df = ticker.history(period=period, interval=yf_interval)
         
         if df.empty:
-            logger.warning(f"Tidak ada data {symbol} dari Yahoo Finance")
             return None
         
         df = df.dropna()
         if df.empty:
-            logger.warning(f"Semua data {symbol} adalah NaN")
             return None
         
         candles = []
@@ -223,11 +303,10 @@ def fetch_crypto_from_yfinance(symbol="BTC", interval="1hour"):
                 volume
             ])
         
-        logger.info(f"Berhasil mengambil {len(candles)} candle {symbol} dari Yahoo Finance")
+        log_data(f"{symbol} ({interval}): {len(candles)} candle dari Yahoo Finance")
         return candles[-200:] if len(candles) > 200 else candles
         
-    except Exception as e:
-        logger.error(f"Error mengambil data {symbol} dari Yahoo Finance: {e}")
+    except Exception:
         return None
 
 
@@ -236,14 +315,12 @@ def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
     pair = f"{symbol}-USDT"
     
     if interval not in KUCOIN_INTERVAL_MAP:
-        logger.error(f"Interval tidak valid untuk KuCoin: {interval}")
         return None
     
     end_at = int(datetime.now(timezone.utc).timestamp())
     start_at = end_at - KUCOIN_INTERVAL_MAP[interval] * candle_limit
 
     try:
-        logger.info(f"Mengambil data {pair} dari KuCoin interval {interval}...")
         response = requests.get(
             "https://api.kucoin.com/api/v1/market/candles",
             params={
@@ -258,26 +335,17 @@ def fetch_crypto_kucoin(symbol="BTC", interval="15min", candle_limit=200):
         data = response.json()
         
         if data.get("code") != "200000":
-            logger.error(f"Error API KuCoin: {data.get('msg', 'Error tidak dikenal')}")
             return None
         
         candles = data.get("data", [])
         if not candles:
-            logger.warning("Tidak ada data candle yang diterima dari KuCoin")
             return None
             
         sorted_candles = sorted(candles, key=lambda x: int(x[0]))
-        logger.info(f"Berhasil mengambil {len(sorted_candles)} candle untuk {pair} dari KuCoin")
+        log_data(f"{symbol} ({interval}): {len(sorted_candles)} candle dari KuCoin")
         return sorted_candles
         
-    except requests.exceptions.Timeout:
-        logger.error("Timeout saat mengambil data dari KuCoin")
-        return None
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error request KuCoin: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Error tidak terduga: {e}")
+    except Exception:
         return None
 
 
@@ -285,30 +353,21 @@ def fetch_crypto_data(symbol="BTC", interval="1hour"):
     """Mengambil data candlestick Crypto - prioritas TradingView, cadangan Yahoo Finance, lalu KuCoin"""
     
     if symbol not in SUPPORTED_COINS:
-        logger.error(f"Simbol tidak valid: {symbol}")
         return None
     
     data = fetch_crypto_from_tradingview(symbol, interval)
-    
     if data and len(data) >= 20:
-        logger.info(f"Data {symbol} berhasil diambil dari TradingView")
         return data
     
-    logger.info("Beralih ke Yahoo Finance...")
     data = fetch_crypto_from_yfinance(symbol, interval)
-    
     if data and len(data) >= 20:
-        logger.info(f"Data {symbol} berhasil diambil dari Yahoo Finance")
         return data
     
-    logger.info("Beralih ke KuCoin...")
     data = fetch_crypto_kucoin(symbol, interval)
-    
     if data and len(data) >= 20:
-        logger.info(f"Data {symbol} berhasil diambil dari KuCoin")
         return data
     
-    logger.error(f"Gagal mengambil data {symbol} dari semua sumber")
+    log_error(f"Gagal mengambil data {symbol}")
     return None
 
 
@@ -316,15 +375,12 @@ def fetch_forex_from_tradingview(symbol="XAUUSD", interval="1hour", n_bars=200):
     """Mengambil data candlestick Forex dari TradingView"""
     
     if not TV_AVAILABLE:
-        logger.error("Pustaka xnoxs-fetcher tidak tersedia")
         return None
     
     if interval not in TV_INTERVAL_MAP or interval == "1week":
-        logger.error(f"Interval tidak valid untuk Forex: {interval}")
         return None
     
     if symbol not in FOREX_PAIRS:
-        logger.error(f"Simbol tidak valid: {symbol}")
         return None
     
     tv_interval = TV_INTERVAL_MAP[interval]
@@ -333,8 +389,6 @@ def fetch_forex_from_tradingview(symbol="XAUUSD", interval="1hour", n_bars=200):
     
     for exchange in exchanges:
         try:
-            logger.info(f"Mencoba mengambil data {symbol} dari TradingView ({exchange}) interval {interval}...")
-            
             df = fetcher.get_historical_data(
                 symbol=symbol,
                 exchange=exchange,
@@ -358,14 +412,12 @@ def fetch_forex_from_tradingview(symbol="XAUUSD", interval="1hour", n_bars=200):
                         float(row["volume"]) if "volume" in row else 0
                     ])
                 
-                logger.info(f"Berhasil mengambil {len(candles)} candle {symbol} dari TradingView ({exchange})")
+                log_data(f"{symbol} ({interval}): {len(candles)} candle dari TradingView")
                 return candles
                 
-        except Exception as e:
-            logger.warning(f"Gagal dari {exchange}: {e}")
+        except Exception:
             continue
     
-    logger.error(f"Gagal mengambil data {symbol} dari semua exchange TradingView")
     return None
 
 
@@ -373,23 +425,18 @@ def fetch_forex_from_yfinance(symbol="XAUUSD", interval="1hour"):
     """Mengambil data candlestick Forex dari Yahoo Finance (cadangan)"""
     
     if not yf:
-        logger.error("Pustaka yfinance tidak tersedia")
         return None
     
     forex_interval_map = {k: v for k, v in INTERVAL_MAP.items() if k != "1week"}
     
     if interval not in forex_interval_map:
-        logger.error(f"Interval tidak valid: {interval}")
         return None
     
     if symbol not in FOREX_PAIRS:
-        logger.error(f"Simbol tidak valid: {symbol}")
         return None
 
     try:
         yf_symbol = FOREX_PAIRS[symbol]["yf_symbol"]
-        logger.info(f"Mengambil data {symbol} dari Yahoo Finance ({yf_symbol}) interval {interval}...")
-        
         yf_interval = forex_interval_map[interval]
         ticker = yf.Ticker(yf_symbol)
         
@@ -401,12 +448,10 @@ def fetch_forex_from_yfinance(symbol="XAUUSD", interval="1hour"):
         df = ticker.history(period=period, interval=yf_interval)
         
         if df.empty:
-            logger.warning(f"Tidak ada data {symbol} dari Yahoo Finance")
             return None
         
         df = df.dropna()
         if df.empty:
-            logger.warning(f"Semua data {symbol} adalah NaN")
             return None
         
         candles = []
@@ -421,11 +466,10 @@ def fetch_forex_from_yfinance(symbol="XAUUSD", interval="1hour"):
                 volume
             ])
         
-        logger.info(f"Berhasil mengambil {len(candles)} candle {symbol} dari Yahoo Finance")
+        log_data(f"{symbol} ({interval}): {len(candles)} candle dari Yahoo Finance")
         return candles[-200:] if len(candles) > 200 else candles
         
-    except Exception as e:
-        logger.error(f"Error mengambil data {symbol} dari Yahoo Finance: {e}")
+    except Exception:
         return None
 
 
@@ -435,27 +479,20 @@ def fetch_forex_data(symbol="XAUUSD", interval="1hour"):
     forex_interval_map = {k: v for k, v in INTERVAL_MAP.items() if k != "1week"}
     
     if interval not in forex_interval_map:
-        logger.error(f"Interval tidak valid: {interval}")
         return None
     
     if symbol not in FOREX_PAIRS:
-        logger.error(f"Simbol tidak valid: {symbol}")
         return None
     
     data = fetch_forex_from_tradingview(symbol, interval)
-    
     if data and len(data) >= 20:
-        logger.info(f"Data {symbol} berhasil diambil dari TradingView")
         return data
     
-    logger.info("Beralih ke Yahoo Finance...")
     data = fetch_forex_from_yfinance(symbol, interval)
-    
     if data and len(data) >= 20:
-        logger.info(f"Data {symbol} berhasil diambil dari Yahoo Finance")
         return data
     
-    logger.error(f"Gagal mengambil data {symbol} dari semua sumber")
+    log_error(f"Gagal mengambil data {symbol}")
     return None
 
 
@@ -476,8 +513,8 @@ def get_crypto_price(symbol="BTC"):
             )
             if df is not None and not df.empty:
                 return float(df.iloc[-1]["close"])
-        except Exception as e:
-            logger.warning(f"Error mengambil harga {symbol} dari TradingView: {e}")
+        except Exception:
+            pass
     
     if yf:
         try:
@@ -486,8 +523,8 @@ def get_crypto_price(symbol="BTC"):
             data = ticker.history(period="1d", interval="1m")
             if not data.empty:
                 return float(data.iloc[-1]["Close"])
-        except Exception as e:
-            logger.warning(f"Error mengambil harga {symbol} dari Yahoo: {e}")
+        except Exception:
+            pass
     
     pair = f"{symbol}-USDT"
     try:
@@ -499,8 +536,8 @@ def get_crypto_price(symbol="BTC"):
         data = response.json()
         if data.get("code") == "200000" and data.get("data"):
             return float(data["data"].get("price", 0))
-    except Exception as e:
-        logger.error(f"Error mengambil harga dari KuCoin: {e}")
+    except Exception:
+        pass
     
     return None
 
@@ -521,8 +558,8 @@ def get_forex_price(symbol="XAUUSD"):
             )
             if df is not None and not df.empty:
                 return float(df.iloc[-1]["close"])
-        except Exception as e:
-            logger.warning(f"Error mengambil harga {symbol} dari TradingView: {e}")
+        except Exception:
+            pass
     
     if yf:
         try:
@@ -531,8 +568,8 @@ def get_forex_price(symbol="XAUUSD"):
             data = ticker.history(period="1d", interval="1m")
             if not data.empty:
                 return float(data.iloc[-1]["Close"])
-        except Exception as e:
-            logger.error(f"Error mengambil harga {symbol} dari Yahoo: {e}")
+        except Exception:
+            pass
     
     return None
 
@@ -587,7 +624,6 @@ def calculate_fibonacci_levels(df):
 def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_type="crypto"):
     """Generate chart candlestick dengan RSI, MACD, Bollinger Bands, dan Fibonacci"""
     if not data:
-        logger.error("Data kosong, tidak bisa membuat chart")
         return None
     
     try:
@@ -682,11 +718,10 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
             panel_ratios=(6, 2, 2, 2)
         )
         
-        logger.info(f"Chart berhasil disimpan: {filename}")
+        log_success(f"Chart {symbol} ({tf}) dibuat")
         return filename
         
-    except Exception as e:
-        logger.error(f"Error membuat chart: {e}")
+    except Exception:
         return None
 
 
@@ -757,7 +792,7 @@ Berikan angka spesifik berdasarkan chart yang terlihat. Jika tidak bisa menentuk
     headers = {"Content-Type": "application/json"}
     
     try:
-        logger.info(f"Mengirim chart {symbol} ke Gemini untuk analisa...")
+        log_analysis(f"Menganalisa {symbol} dengan AI...")
         response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=60)
         
         if response.status_code == 200:
@@ -768,15 +803,13 @@ Berikan angka spesifik berdasarkan chart yang terlihat. Jika tidak bisa menentuk
                 if "content" in candidate and "parts" in candidate["content"]:
                     text = candidate["content"]["parts"][0].get("text", "")
                     if text:
-                        logger.info("Analisa Gemini berhasil")
+                        log_success(f"Analisa {symbol} selesai")
                         return text
             
-            logger.warning(f"Format respons tidak sesuai: {result}")
             return "Format respons Gemini tidak sesuai. Coba lagi."
             
         elif response.status_code == 400:
             error_detail = response.json()
-            logger.error(f"Request tidak valid: {error_detail}")
             return f"Error: Request tidak valid - {error_detail.get('error', {}).get('message', 'Tidak diketahui')}"
             
         elif response.status_code == 403:
@@ -786,16 +819,13 @@ Berikan angka spesifik berdasarkan chart yang terlihat. Jika tidak bisa menentuk
             return "Error: Batas permintaan tercapai. Tunggu beberapa saat dan coba lagi."
             
         else:
-            logger.error(f"Error Gemini API: {response.status_code} - {response.text}")
             return f"Error dari Gemini API (status: {response.status_code})"
             
     except requests.exceptions.Timeout:
         return "Timeout saat menghubungi Gemini API. Coba lagi."
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error request: {e}")
         return f"Error koneksi: {e}"
     except Exception as e:
-        logger.error(f"Error tidak terduga: {e}")
         return f"Error: {e}"
 
 
@@ -1503,22 +1533,43 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 def main():
     """Fungsi utama untuk menjalankan bot"""
+    print_banner()
+    
+    print(f"{Colors.WHITE}{Colors.BOLD}  Memeriksa konfigurasi...{Colors.RESET}")
+    print()
+    
     if not TELEGRAM_BOT_TOKEN:
-        print("❌ Error: TELEGRAM_BOT_TOKEN tidak ditemukan!")
-        print("Set environment variable: export TELEGRAM_BOT_TOKEN='token_anda'")
+        log_error("TELEGRAM_BOT_TOKEN tidak ditemukan!")
+        log_info("Set di Replit Secrets: TELEGRAM_BOT_TOKEN")
         sys.exit(1)
+    else:
+        log_success("Telegram Bot Token terkonfigurasi")
     
     if not GEMINI_API_KEY:
-        print("⚠️ Peringatan: GEMINI_API_KEY tidak ditemukan!")
-        print("Analisa AI tidak akan berfungsi tanpa API key.")
-        print("Set environment variable: export GEMINI_API_KEY='key_anda'")
+        log_warning("GEMINI_API_KEY tidak ditemukan - Analisa AI tidak aktif")
+    else:
+        log_success("Gemini API Key terkonfigurasi")
     
-    print("🚀 Memulai Bot Analisa Teknikal Trading...")
-    print(f"📊 Token Telegram: {TELEGRAM_BOT_TOKEN[:10]}...")
-    print(f"🤖 Gemini API: {'Terkonfigurasi' if GEMINI_API_KEY else 'Tidak terkonfigurasi'}")
-    print(f"💰 Cryptocurrency: {len(SUPPORTED_COINS)} koin")
-    print(f"💱 Forex & Komoditas: {len(FOREX_PAIRS)} pasangan")
-    print(f"📡 TradingView: {'Tersedia' if TV_AVAILABLE else 'Tidak tersedia'}")
+    print()
+    print(f"{Colors.WHITE}{Colors.BOLD}  Status Sistem:{Colors.RESET}")
+    print()
+    
+    if TV_AVAILABLE:
+        log_success(f"TradingView: Aktif")
+    else:
+        log_warning(f"TradingView: Tidak tersedia (fallback ke Yahoo/KuCoin)")
+    
+    if yf:
+        log_success(f"Yahoo Finance: Aktif")
+    else:
+        log_warning(f"Yahoo Finance: Tidak tersedia")
+    
+    log_info(f"Cryptocurrency: {len(SUPPORTED_COINS)} koin didukung")
+    log_info(f"Forex & Komoditas: {len(FOREX_PAIRS)} pasangan didukung")
+    
+    print()
+    print(f"{Colors.WHITE}{Colors.BOLD}  Memulai bot...{Colors.RESET}")
+    print()
     
     app = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
     
@@ -1534,7 +1585,12 @@ def main():
     
     app.add_error_handler(error_handler)
     
-    print("✅ Bot siap menerima pesan!")
+    log_success("Bot siap menerima pesan!")
+    print()
+    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
+    print(f"{Colors.GREEN}  Bot berjalan... Tekan Ctrl+C untuk berhenti{Colors.RESET}")
+    print(f"{Colors.GREEN}{Colors.BOLD}  ══════════════════════════════════════════{Colors.RESET}")
+    print()
     
     app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
