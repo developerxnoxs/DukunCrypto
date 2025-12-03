@@ -163,7 +163,6 @@ tmp/
 .pythonlibs/
 .upm/
 replit.nix
-replit.md
 
 # Charts output (if saved to disk)
 charts/

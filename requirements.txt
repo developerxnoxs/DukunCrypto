@@ -17,3 +17,15 @@ websocket-client>=1.7.0   # WebSocket support
 # Async Support
 nest-asyncio>=1.6.0       # Nested async loop support
 python-dotenv             # Load config from .env file
+mplfinance
+nest-asyncio
+pandas
+pillow
+python-dotenv
+python-telegram-bot
+pytz
+requests
+telegram
+websocket-client
+xnoxs-fetcher
+yfinance
