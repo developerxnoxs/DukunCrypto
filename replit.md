@@ -1,8 +1,8 @@
-# Bot Analisa Teknikal Trading
+# Bot Analisa Teknikal Trading Pro
 
 ## Ringkasan
 
-Proyek ini adalah bot Telegram yang menyediakan analisa teknikal berbasis AI untuk pasar cryptocurrency dan forex/komoditas. Sistem menggunakan Google Gemini Vision API untuk menganalisa chart candlestick dengan indikator teknikal, memberikan insight langsung ke pengguna melalui Telegram.
+Proyek ini adalah bot Telegram yang menyediakan analisa teknikal PROFESIONAL berbasis AI untuk pasar cryptocurrency dan forex/komoditas. Sistem menggunakan Google Gemini Vision API dengan sistem konfluensi multi-indikator untuk menganalisa chart candlestick, memberikan insight akurat ke pengguna melalui Telegram.
 
 Bot mendukung:
 - **Cryptocurrency**: 14 koin populer (BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, MATIC, LINK, DOT, ATOM, UNI, LTC)
@@ -39,21 +39,62 @@ ai-trading-analysis-bots/
 └── replit.md                # File ini
 ```
 
-## Indikator Teknikal
+## Indikator Teknikal (Enhanced - v3.0)
 
-- **EMA20 dan EMA50**: Exponential Moving Averages (overlay harga)
-- **Bollinger Bands**: 20-period, 2 standard deviations
+### Indikator Overlay (Panel Utama)
+- **EMA20**: Exponential Moving Average 20-period (biru)
+- **EMA50**: Exponential Moving Average 50-period (orange)
+- **EMA200**: Exponential Moving Average 200-period (merah) - Tren Jangka Panjang
+- **Bollinger Bands**: 20-period, 2 standard deviations (ungu)
 - **Fibonacci Retracement**: Level otomatis (23.6%, 38.2%, 50%, 61.8%)
-- **RSI**: 14-period dengan garis overbought (70) / oversold (30)
-- **MACD**: 12/26/9 dengan signal line dan histogram
 
-## Layout Chart
+### Indikator Momentum
+- **RSI (14)**: dengan level 30/50/70
+- **Stochastic RSI**: dengan level 20/80 untuk deteksi overbought/oversold ekstrem
+- **MACD (12/26/9)**: dengan signal line dan histogram
 
-Layout profesional 4-panel dengan rasio 6:2:2:2:
-1. Candlestick + EMA + Bollinger + Fibonacci
-2. Volume bars
-3. Indikator RSI
-4. Indikator MACD
+### Indikator Konfluensi (Baru)
+- **ADX (Average Directional Index)**: Mengukur kekuatan tren
+  - ADX > 40: Tren SANGAT KUAT
+  - ADX > 25: Tren KUAT
+  - ADX > 20: Tren SEDANG
+  - ADX < 20: Tren LEMAH / Ranging
+- **ATR (Average True Range)**: Volatilitas untuk kalkulasi SL/TP dinamis
+- **RSI Divergence Detection**: Deteksi bullish/bearish divergence
+- **MACD Divergence Detection**: Deteksi bullish/bearish divergence
+
+## Sistem Konfluensi Multi-Indikator (Baru - v3.0)
+
+Sistem menghitung 10+ sinyal untuk menentukan kekuatan dan arah tren:
+
+| Sinyal | Kondisi Bullish | Kondisi Bearish |
+|--------|-----------------|-----------------|
+| EMA Crossover | EMA20 > EMA50 | EMA20 < EMA50 |
+| Trend Direction | Harga > EMA20 > EMA50 | Harga < EMA20 < EMA50 |
+| EMA200 Position | Harga > EMA200 | Harga < EMA200 |
+| RSI | < 30 (oversold) | > 70 (overbought) |
+| Stochastic RSI | < 20 (oversold) | > 80 (overbought) |
+| MACD Crossover | MACD > Signal | MACD < Signal |
+| MACD Histogram | Momentum positif & naik | Momentum negatif & turun |
+| Bollinger Position | Di bawah Lower Band | Di atas Upper Band |
+| RSI Divergence | Bullish Divergence | Bearish Divergence |
+| MACD Divergence | Bullish Divergence | Bearish Divergence |
+
+### Output Sinyal
+- **STRONG_BUY**: Skor bullish >= 70% dengan konfirmasi tinggi
+- **BUY**: Skor bullish > bearish x 1.3
+- **HOLD**: Sinyal seimbang atau konflik
+- **SELL**: Skor bearish > bullish x 1.3
+- **STRONG_SELL**: Skor bearish >= 70% dengan konfirmasi tinggi
+
+## Layout Chart (Enhanced - v3.0)
+
+Layout profesional 5-panel dengan rasio 6:2:1.5:1.5:1.5:
+1. **Candlestick + EMA20 + EMA50 + EMA200 + Bollinger + Fibonacci**
+2. **Volume bars**
+3. **RSI (14)** dengan level 30/50/70
+4. **Stochastic RSI** dengan level 20/80
+5. **MACD** dengan histogram
 
 ## Analisa Berbasis Timeframe (v2.1)
 
@@ -109,18 +150,38 @@ GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 2. **Yahoo Finance** (cadangan) - via yfinance
 3. **KuCoin API** (cadangan crypto) - REST API langsung
 
-## Fitur Bot
+## Fitur Bot (Enhanced - v3.0)
 
 - Menu pilihan pasar (Cryptocurrency / Forex)
 - Pilihan timeframe interaktif
-- Chart candlestick dengan indikator lengkap
-- Analisa AI dengan Gemini Vision
-- Sinyal BELI/JUAL/TAHAN
-- Rekomendasi harga masuk, target profit, stop loss
+- Chart candlestick dengan 8+ indikator teknikal
+- Sistem Konfluensi Multi-Indikator
+- Deteksi RSI & MACD Divergence
+- ADX untuk kekuatan tren
+- ATR untuk volatilitas & penentuan SL/TP dinamis
+- EMA200 untuk tren jangka panjang
+- Stochastic RSI untuk momentum sensitif
+- Analisa AI Gemini Vision Enhanced dengan konteks konfluensi
+- Sinyal STRONG BUY/BUY/HOLD/SELL/STRONG SELL
+- 3 Level Target Profit + Stop Loss Optimal
+- Support & Resistance Multi-Level
 - Output dalam Bahasa Indonesia
 
 ## Perubahan Terbaru
 
+- 2024-12-04: **v3.0 - Enhanced Analysis System**
+  - Menambahkan EMA200 untuk identifikasi tren jangka panjang
+  - Menambahkan Stochastic RSI untuk momentum sensitif
+  - Menambahkan ADX untuk mengukur kekuatan tren
+  - Menambahkan ATR untuk kalkulasi volatilitas dan SL/TP dinamis
+  - Implementasi sistem konfluensi multi-indikator (10+ sinyal)
+  - Implementasi deteksi RSI & MACD divergence
+  - Upgrade prompt Gemini AI dengan konteks konfluensi lengkap
+  - Chart sekarang 5-panel (Price, Volume, RSI, Stoch RSI, MACD)
+  - Sinyal baru: STRONG_BUY dan STRONG_SELL
+  - 3 level target profit
+  - Kekuatan sinyal (X dari 8 indikator)
+  - Peringatan risiko dalam analisa
 - 2024-12-03: Menggabungkan btc_analyzer dan xau_analyzer menjadi main.py
 - 2024-12-03: Menambahkan menu pilihan pasar (crypto/forex)
 - 2024-12-03: Mengubah semua output ke Bahasa Indonesia

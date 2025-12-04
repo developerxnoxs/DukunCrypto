@@ -621,8 +621,403 @@ def calculate_fibonacci_levels(df):
     return levels
 
 
+def calculate_atr(df, period=14):
+    """Menghitung ATR (Average True Range) - untuk volatilitas dan penentuan SL/TP"""
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
+    
+    tr1 = high - low
+    tr2 = abs(high - close.shift(1))
+    tr3 = abs(low - close.shift(1))
+    
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    atr = tr.rolling(window=period).mean()
+    return atr
+
+
+def calculate_stochastic_rsi(series, rsi_period=14, stoch_period=14, smooth_k=3, smooth_d=3):
+    """Menghitung Stochastic RSI - lebih sensitif dari RSI biasa"""
+    rsi = calculate_rsi(series, rsi_period)
+    
+    rsi_min = rsi.rolling(window=stoch_period).min()
+    rsi_max = rsi.rolling(window=stoch_period).max()
+    
+    stoch_rsi = ((rsi - rsi_min) / (rsi_max - rsi_min)) * 100
+    stoch_rsi = stoch_rsi.fillna(50)
+    
+    stoch_k = stoch_rsi.rolling(window=smooth_k).mean()
+    stoch_d = stoch_k.rolling(window=smooth_d).mean()
+    
+    return stoch_k, stoch_d
+
+
+def calculate_adx(df, period=14):
+    """Menghitung ADX (Average Directional Index) - mengukur kekuatan tren"""
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
+    
+    plus_dm = high.diff()
+    minus_dm = -low.diff()
+    
+    plus_dm = plus_dm.where((plus_dm > minus_dm) & (plus_dm > 0), 0)
+    minus_dm = minus_dm.where((minus_dm > plus_dm) & (minus_dm > 0), 0)
+    
+    tr1 = high - low
+    tr2 = abs(high - close.shift(1))
+    tr3 = abs(low - close.shift(1))
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    
+    atr = tr.rolling(window=period).mean()
+    plus_di = 100 * (plus_dm.rolling(window=period).mean() / atr)
+    minus_di = 100 * (minus_dm.rolling(window=period).mean() / atr)
+    
+    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+    adx = dx.rolling(window=period).mean()
+    
+    return adx, plus_di, minus_di
+
+
+def calculate_vwap(df):
+    """Menghitung VWAP (Volume Weighted Average Price)"""
+    typical_price = (df['High'] + df['Low'] + df['Close']) / 3
+    vwap = (typical_price * df['Volume']).cumsum() / df['Volume'].cumsum()
+    return vwap
+
+
+def calculate_ema(series, period):
+    """Menghitung EMA dengan period tertentu"""
+    return series.ewm(span=period, adjust=False).mean()
+
+
+def detect_rsi_divergence(df, rsi, lookback=10):
+    """Mendeteksi RSI divergence (bullish/bearish)"""
+    close = df['Close']
+    divergence = []
+    
+    for i in range(lookback, len(df)):
+        price_window = close.iloc[i-lookback:i+1]
+        rsi_window = rsi.iloc[i-lookback:i+1]
+        
+        price_min_idx = price_window.idxmin()
+        price_max_idx = price_window.idxmax()
+        
+        current_price = close.iloc[i]
+        current_rsi = rsi.iloc[i]
+        
+        if current_price <= price_window.min() * 1.01:
+            rsi_at_prev_low = rsi.loc[price_min_idx] if price_min_idx in rsi.index else current_rsi
+            if current_rsi > rsi_at_prev_low:
+                divergence.append("bullish")
+                continue
+        
+        if current_price >= price_window.max() * 0.99:
+            rsi_at_prev_high = rsi.loc[price_max_idx] if price_max_idx in rsi.index else current_rsi
+            if current_rsi < rsi_at_prev_high:
+                divergence.append("bearish")
+                continue
+        
+        divergence.append("none")
+    
+    result = ['none'] * lookback + divergence
+    return result[-1] if result else "none"
+
+
+def detect_macd_divergence(df, macd_line, lookback=10):
+    """Mendeteksi MACD divergence (bullish/bearish)"""
+    close = df['Close']
+    
+    for i in range(lookback, len(df)):
+        price_window = close.iloc[i-lookback:i+1]
+        macd_window = macd_line.iloc[i-lookback:i+1]
+        
+        current_price = close.iloc[i]
+        current_macd = macd_line.iloc[i]
+        
+        if current_price <= price_window.min() * 1.01:
+            prev_macd_at_low = macd_window.min()
+            if current_macd > prev_macd_at_low:
+                return "bullish"
+        
+        if current_price >= price_window.max() * 0.99:
+            prev_macd_at_high = macd_window.max()
+            if current_macd < prev_macd_at_high:
+                return "bearish"
+    
+    return "none"
+
+
+def calculate_confluence_score(df, market_type="crypto"):
+    """Menghitung skor konfluensi dari berbagai indikator untuk sinyal trading"""
+    close = df['Close']
+    current_price = close.iloc[-1]
+    
+    ema20 = calculate_ema(close, 20)
+    ema50 = calculate_ema(close, 50)
+    ema200 = calculate_ema(close, 200)
+    
+    rsi = calculate_rsi(close, 14)
+    current_rsi = rsi.iloc[-1]
+    
+    macd_line, signal_line, histogram = calculate_macd(close)
+    current_macd = macd_line.iloc[-1]
+    current_signal = signal_line.iloc[-1]
+    current_hist = histogram.iloc[-1]
+    prev_hist = histogram.iloc[-2] if len(histogram) > 1 else 0
+    
+    bb_upper, bb_middle, bb_lower = calculate_bollinger_bands(close)
+    
+    stoch_k, stoch_d = calculate_stochastic_rsi(close)
+    current_stoch_k = stoch_k.iloc[-1]
+    current_stoch_d = stoch_d.iloc[-1]
+    
+    adx, plus_di, minus_di = calculate_adx(df)
+    current_adx = adx.iloc[-1] if not pd.isna(adx.iloc[-1]) else 20
+    current_plus_di = plus_di.iloc[-1] if not pd.isna(plus_di.iloc[-1]) else 25
+    current_minus_di = minus_di.iloc[-1] if not pd.isna(minus_di.iloc[-1]) else 25
+    
+    atr = calculate_atr(df)
+    current_atr = atr.iloc[-1] if not pd.isna(atr.iloc[-1]) else 0
+    
+    rsi_divergence = detect_rsi_divergence(df, rsi)
+    macd_divergence = detect_macd_divergence(df, macd_line)
+    
+    bullish_signals = 0
+    bearish_signals = 0
+    neutral_signals = 0
+    total_weight = 0
+    
+    signal_details = {
+        "bullish": [],
+        "bearish": [],
+        "neutral": []
+    }
+    
+    weight = 2
+    total_weight += weight
+    if current_price > ema20.iloc[-1] and current_price > ema50.iloc[-1]:
+        bullish_signals += weight
+        signal_details["bullish"].append("Harga di atas EMA20 & EMA50")
+    elif current_price < ema20.iloc[-1] and current_price < ema50.iloc[-1]:
+        bearish_signals += weight
+        signal_details["bearish"].append("Harga di bawah EMA20 & EMA50")
+    else:
+        neutral_signals += weight
+        signal_details["neutral"].append("Harga di antara EMA20 & EMA50")
+    
+    if len(ema200) > 0 and not pd.isna(ema200.iloc[-1]):
+        weight = 1.5
+        total_weight += weight
+        if current_price > ema200.iloc[-1]:
+            bullish_signals += weight
+            signal_details["bullish"].append("Harga di atas EMA200 (tren jangka panjang bullish)")
+        else:
+            bearish_signals += weight
+            signal_details["bearish"].append("Harga di bawah EMA200 (tren jangka panjang bearish)")
+    
+    weight = 1.5
+    total_weight += weight
+    if ema20.iloc[-1] > ema50.iloc[-1]:
+        if ema20.iloc[-2] <= ema50.iloc[-2]:
+            bullish_signals += weight * 1.5
+            signal_details["bullish"].append("Golden Cross EMA20/EMA50 (sinyal kuat)")
+        else:
+            bullish_signals += weight
+            signal_details["bullish"].append("EMA20 di atas EMA50")
+    else:
+        if ema20.iloc[-2] >= ema50.iloc[-2]:
+            bearish_signals += weight * 1.5
+            signal_details["bearish"].append("Death Cross EMA20/EMA50 (sinyal kuat)")
+        else:
+            bearish_signals += weight
+            signal_details["bearish"].append("EMA20 di bawah EMA50")
+    
+    weight = 2
+    total_weight += weight
+    if current_rsi < 30:
+        bullish_signals += weight
+        signal_details["bullish"].append(f"RSI oversold ({current_rsi:.1f})")
+    elif current_rsi > 70:
+        bearish_signals += weight
+        signal_details["bearish"].append(f"RSI overbought ({current_rsi:.1f})")
+    elif current_rsi > 50:
+        bullish_signals += weight * 0.5
+        signal_details["bullish"].append(f"RSI bullish zone ({current_rsi:.1f})")
+    else:
+        bearish_signals += weight * 0.5
+        signal_details["bearish"].append(f"RSI bearish zone ({current_rsi:.1f})")
+    
+    weight = 2
+    total_weight += weight
+    if current_macd > current_signal:
+        if macd_line.iloc[-2] <= signal_line.iloc[-2]:
+            bullish_signals += weight * 1.5
+            signal_details["bullish"].append("MACD Bullish Crossover (sinyal beli)")
+        else:
+            bullish_signals += weight
+            signal_details["bullish"].append("MACD di atas Signal Line")
+    else:
+        if macd_line.iloc[-2] >= signal_line.iloc[-2]:
+            bearish_signals += weight * 1.5
+            signal_details["bearish"].append("MACD Bearish Crossover (sinyal jual)")
+        else:
+            bearish_signals += weight
+            signal_details["bearish"].append("MACD di bawah Signal Line")
+    
+    weight = 1
+    total_weight += weight
+    if current_hist > 0 and current_hist > prev_hist:
+        bullish_signals += weight
+        signal_details["bullish"].append("MACD histogram meningkat (momentum bullish)")
+    elif current_hist < 0 and current_hist < prev_hist:
+        bearish_signals += weight
+        signal_details["bearish"].append("MACD histogram menurun (momentum bearish)")
+    else:
+        neutral_signals += weight
+        signal_details["neutral"].append("MACD histogram netral")
+    
+    weight = 1.5
+    total_weight += weight
+    if current_price <= bb_lower.iloc[-1]:
+        bullish_signals += weight
+        signal_details["bullish"].append("Harga di bawah Lower Bollinger Band (oversold)")
+    elif current_price >= bb_upper.iloc[-1]:
+        bearish_signals += weight
+        signal_details["bearish"].append("Harga di atas Upper Bollinger Band (overbought)")
+    else:
+        bb_position = (current_price - bb_lower.iloc[-1]) / (bb_upper.iloc[-1] - bb_lower.iloc[-1])
+        if bb_position < 0.3:
+            bullish_signals += weight * 0.5
+            signal_details["bullish"].append("Harga mendekati Lower BB")
+        elif bb_position > 0.7:
+            bearish_signals += weight * 0.5
+            signal_details["bearish"].append("Harga mendekati Upper BB")
+        else:
+            neutral_signals += weight
+            signal_details["neutral"].append("Harga di tengah Bollinger Bands")
+    
+    weight = 1.5
+    total_weight += weight
+    if current_stoch_k < 20:
+        bullish_signals += weight
+        signal_details["bullish"].append(f"Stochastic RSI oversold ({current_stoch_k:.1f})")
+    elif current_stoch_k > 80:
+        bearish_signals += weight
+        signal_details["bearish"].append(f"Stochastic RSI overbought ({current_stoch_k:.1f})")
+    elif current_stoch_k > current_stoch_d:
+        bullish_signals += weight * 0.5
+        signal_details["bullish"].append("Stochastic RSI bullish")
+    else:
+        bearish_signals += weight * 0.5
+        signal_details["bearish"].append("Stochastic RSI bearish")
+    
+    weight = 1.5
+    total_weight += weight
+    if current_adx > 25:
+        if current_plus_di > current_minus_di:
+            bullish_signals += weight
+            signal_details["bullish"].append(f"ADX kuat ({current_adx:.1f}) dengan +DI dominan")
+        else:
+            bearish_signals += weight
+            signal_details["bearish"].append(f"ADX kuat ({current_adx:.1f}) dengan -DI dominan")
+    else:
+        neutral_signals += weight
+        signal_details["neutral"].append(f"ADX lemah ({current_adx:.1f}) - tren tidak jelas")
+    
+    weight = 2
+    if rsi_divergence == "bullish":
+        bullish_signals += weight
+        signal_details["bullish"].append("RSI Bullish Divergence terdeteksi (sinyal reversal)")
+    elif rsi_divergence == "bearish":
+        bearish_signals += weight
+        signal_details["bearish"].append("RSI Bearish Divergence terdeteksi (sinyal reversal)")
+    
+    if macd_divergence == "bullish":
+        bullish_signals += weight
+        signal_details["bullish"].append("MACD Bullish Divergence terdeteksi")
+    elif macd_divergence == "bearish":
+        bearish_signals += weight
+        signal_details["bearish"].append("MACD Bearish Divergence terdeteksi")
+    
+    total_signals = bullish_signals + bearish_signals + neutral_signals
+    
+    if total_signals > 0:
+        bullish_pct = (bullish_signals / total_signals) * 100
+        bearish_pct = (bearish_signals / total_signals) * 100
+    else:
+        bullish_pct = 50
+        bearish_pct = 50
+    
+    if bullish_signals > bearish_signals * 1.3:
+        if bullish_pct >= 70:
+            signal = "STRONG_BUY"
+            confidence = "TINGGI"
+        else:
+            signal = "BUY"
+            confidence = "SEDANG"
+    elif bearish_signals > bullish_signals * 1.3:
+        if bearish_pct >= 70:
+            signal = "STRONG_SELL"
+            confidence = "TINGGI"
+        else:
+            signal = "SELL"
+            confidence = "SEDANG"
+    else:
+        signal = "HOLD"
+        confidence = "RENDAH"
+    
+    trend_strength = "TIDAK JELAS"
+    if current_adx > 40:
+        trend_strength = "SANGAT KUAT"
+    elif current_adx > 25:
+        trend_strength = "KUAT"
+    elif current_adx > 20:
+        trend_strength = "SEDANG"
+    else:
+        trend_strength = "LEMAH"
+    
+    if current_price > ema20.iloc[-1] > ema50.iloc[-1]:
+        trend_direction = "UPTREND"
+    elif current_price < ema20.iloc[-1] < ema50.iloc[-1]:
+        trend_direction = "DOWNTREND"
+    else:
+        trend_direction = "SIDEWAYS"
+    
+    atr_pct = (current_atr / current_price) * 100 if current_price > 0 else 0
+    
+    return {
+        "signal": signal,
+        "confidence": confidence,
+        "bullish_score": bullish_signals,
+        "bearish_score": bearish_signals,
+        "neutral_score": neutral_signals,
+        "bullish_pct": bullish_pct,
+        "bearish_pct": bearish_pct,
+        "trend_direction": trend_direction,
+        "trend_strength": trend_strength,
+        "adx": current_adx,
+        "rsi": current_rsi,
+        "stoch_rsi": current_stoch_k,
+        "atr": current_atr,
+        "atr_pct": atr_pct,
+        "rsi_divergence": rsi_divergence,
+        "macd_divergence": macd_divergence,
+        "signal_details": signal_details,
+        "ema20": ema20.iloc[-1],
+        "ema50": ema50.iloc[-1],
+        "ema200": ema200.iloc[-1] if len(ema200) > 0 and not pd.isna(ema200.iloc[-1]) else None,
+        "bb_upper": bb_upper.iloc[-1],
+        "bb_lower": bb_lower.iloc[-1],
+        "bb_middle": bb_middle.iloc[-1],
+        "macd": current_macd,
+        "macd_signal": current_signal,
+        "macd_hist": current_hist
+    }
+
+
 def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_type="crypto"):
-    """Generate chart candlestick dengan RSI, MACD, Bollinger Bands, dan Fibonacci"""
+    """Generate chart candlestick dengan RSI, MACD, Bollinger Bands, Fibonacci, Stochastic RSI, dan EMA200"""
     if not data:
         return None
     
@@ -657,12 +1052,18 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
 
         ema20 = df['Close'].ewm(span=20, adjust=False).mean()
         ema50 = df['Close'].ewm(span=50, adjust=False).mean()
+        ema200 = df['Close'].ewm(span=200, adjust=False).mean()
         
         bb_upper, bb_middle, bb_lower = calculate_bollinger_bands(df['Close'])
         
         rsi = calculate_rsi(df['Close'])
         rsi_overbought = pd.Series([70] * len(df), index=df.index)
         rsi_oversold = pd.Series([30] * len(df), index=df.index)
+        rsi_middle = pd.Series([50] * len(df), index=df.index)
+        
+        stoch_k, stoch_d = calculate_stochastic_rsi(df['Close'])
+        stoch_overbought = pd.Series([80] * len(df), index=df.index)
+        stoch_oversold = pd.Series([20] * len(df), index=df.index)
         
         macd_line, signal_line, macd_histogram = calculate_macd(df['Close'])
         
@@ -677,6 +1078,7 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
         addplots = [
             mpf.make_addplot(ema20, color='blue', width=1.2),
             mpf.make_addplot(ema50, color='orange', width=1.2),
+            mpf.make_addplot(ema200, color='red', width=1.5, linestyle='-'),
             
             mpf.make_addplot(bb_upper, color='purple', width=0.8, linestyle='--'),
             mpf.make_addplot(bb_middle, color='purple', width=0.5, linestyle=':'),
@@ -690,18 +1092,24 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
             mpf.make_addplot(rsi, panel=2, color='#9C27B0', width=1.2, ylabel='RSI'),
             mpf.make_addplot(rsi_overbought, panel=2, color='red', width=0.5, linestyle='--'),
             mpf.make_addplot(rsi_oversold, panel=2, color='green', width=0.5, linestyle='--'),
+            mpf.make_addplot(rsi_middle, panel=2, color='gray', width=0.3, linestyle=':'),
             
-            mpf.make_addplot(macd_line, panel=3, color='blue', width=1, ylabel='MACD'),
-            mpf.make_addplot(signal_line, panel=3, color='red', width=1),
-            mpf.make_addplot(macd_histogram, panel=3, type='bar', color=macd_colors, width=0.7),
+            mpf.make_addplot(stoch_k, panel=3, color='#2196F3', width=1.2, ylabel='Stoch RSI'),
+            mpf.make_addplot(stoch_d, panel=3, color='#FF9800', width=1),
+            mpf.make_addplot(stoch_overbought, panel=3, color='red', width=0.5, linestyle='--'),
+            mpf.make_addplot(stoch_oversold, panel=3, color='green', width=0.5, linestyle='--'),
+            
+            mpf.make_addplot(macd_line, panel=4, color='blue', width=1, ylabel='MACD'),
+            mpf.make_addplot(signal_line, panel=4, color='red', width=1),
+            mpf.make_addplot(macd_histogram, panel=4, type='bar', color=macd_colors, width=0.7),
         ]
 
         if market_type == "crypto":
-            title = f"\n{symbol}/USDT ({tf}) - Analisa Teknikal"
+            title = f"\n{symbol}/USDT ({tf}) - Analisa Teknikal Pro"
             ylabel = "Harga (USDT)"
         else:
             pair_info = FOREX_PAIRS.get(symbol, {"name": symbol})
-            title = f"\n{symbol} - {pair_info['name']} ({tf}) - Analisa Teknikal"
+            title = f"\n{symbol} - {pair_info['name']} ({tf}) - Analisa Teknikal Pro"
             ylabel = "Harga"
 
         mpf.plot(
@@ -710,12 +1118,12 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
             ylabel=ylabel,
             ylabel_lower="Volume",
             savefig=dict(fname=filename, dpi=150, bbox_inches='tight'),
-            figratio=(16, 12),
+            figratio=(16, 14),
             figscale=1.5,
             tight_layout=True,
             addplot=addplots,
             warn_too_much_data=500,
-            panel_ratios=(6, 2, 2, 2)
+            panel_ratios=(6, 2, 1.5, 1.5, 1.5)
         )
         
         log_success(f"Chart {symbol} ({tf}) dibuat")
@@ -723,6 +1131,37 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
         
     except Exception:
         return None
+
+
+def generate_chart_with_confluence(data, filename="chart.png", symbol="BTC", tf="15min", market_type="crypto"):
+    """Generate chart dan hitung confluence score"""
+    if not data:
+        return None, None
+    
+    try:
+        ohlc = []
+        for item in data:
+            ts = datetime.fromtimestamp(int(item[0]), tz=tz("Asia/Jakarta"))
+            ohlc.append([
+                ts,
+                float(item[1]),
+                float(item[3]),
+                float(item[4]),
+                float(item[2]),
+                float(item[5])
+            ])
+        
+        df = pd.DataFrame(ohlc, columns=["Date", "Open", "High", "Low", "Close", "Volume"])
+        df.set_index("Date", inplace=True)
+        
+        confluence = calculate_confluence_score(df, market_type)
+        
+        chart_path = generate_chart(data, filename, symbol, tf, market_type)
+        
+        return chart_path, confluence
+        
+    except Exception:
+        return None, None
 
 
 def get_timeframe_context(interval):
@@ -828,8 +1267,8 @@ def get_timeframe_context(interval):
     return timeframe_configs.get(interval, timeframe_configs["1hour"])
 
 
-def analyze_with_gemini(image_path, symbol, market_type="crypto", interval="1hour"):
-    """Analisa chart menggunakan Gemini Vision API dengan konteks timeframe"""
+def analyze_with_gemini(image_path, symbol, market_type="crypto", interval="1hour", confluence=None):
+    """Analisa chart menggunakan Gemini Vision API dengan konteks timeframe dan confluence score"""
     if not GEMINI_API_KEY:
         return "GEMINI_API_KEY tidak ditemukan. Silakan set environment variable terlebih dahulu."
     
@@ -853,58 +1292,136 @@ def analyze_with_gemini(image_path, symbol, market_type="crypto", interval="1hou
         asset_name = f"{symbol} ({pair_info.get('name', symbol)})"
 
     tf_context = get_timeframe_context(interval)
+    
+    confluence_context = ""
+    if confluence:
+        bullish_details = "\n  - ".join(confluence['signal_details']['bullish'][:5]) if confluence['signal_details']['bullish'] else "Tidak ada"
+        bearish_details = "\n  - ".join(confluence['signal_details']['bearish'][:5]) if confluence['signal_details']['bearish'] else "Tidak ada"
+        
+        confluence_context = f"""
+DATA ANALISA KUANTITATIF (SUDAH DIHITUNG):
+- Sinyal Sistem: {confluence['signal']} (Keyakinan: {confluence['confidence']})
+- Skor Bullish: {confluence['bullish_pct']:.1f}% | Skor Bearish: {confluence['bearish_pct']:.1f}%
+- Arah Tren: {confluence['trend_direction']} | Kekuatan Tren: {confluence['trend_strength']}
+- ADX (Kekuatan Tren): {confluence['adx']:.1f} {'(Tren Kuat)' if confluence['adx'] > 25 else '(Tren Lemah)'}
+- RSI: {confluence['rsi']:.1f} {'(Overbought - Potensi Turun)' if confluence['rsi'] > 70 else '(Oversold - Potensi Naik)' if confluence['rsi'] < 30 else '(Netral)'}
+- Stochastic RSI: {confluence['stoch_rsi']:.1f} {'(Overbought)' if confluence['stoch_rsi'] > 80 else '(Oversold)' if confluence['stoch_rsi'] < 20 else '(Netral)'}
+- ATR (Volatilitas): {confluence['atr']:.4f} ({confluence['atr_pct']:.2f}% dari harga)
+- RSI Divergence: {confluence['rsi_divergence'].upper()} {'(Sinyal Reversal Kuat!)' if confluence['rsi_divergence'] != 'none' else ''}
+- MACD Divergence: {confluence['macd_divergence'].upper()} {'(Sinyal Reversal Kuat!)' if confluence['macd_divergence'] != 'none' else ''}
+- EMA20: {confluence['ema20']:.4f} | EMA50: {confluence['ema50']:.4f} | EMA200: {confluence['ema200']:.4f if confluence['ema200'] else 'N/A'}
+- Bollinger Upper: {confluence['bb_upper']:.4f} | Middle: {confluence['bb_middle']:.4f} | Lower: {confluence['bb_lower']:.4f}
+- MACD: {confluence['macd']:.6f} | Signal: {confluence['macd_signal']:.6f} | Histogram: {confluence['macd_hist']:.6f}
 
-    prompt = f"""Kamu adalah analis teknikal profesional. Analisa chart candlestick {asset_name} pada timeframe {tf_context['name']} ini.
+SINYAL BULLISH TERDETEKSI:
+  - {bullish_details}
+
+SINYAL BEARISH TERDETEKSI:
+  - {bearish_details}
+"""
+
+    prompt = f"""Kamu adalah analis teknikal profesional dengan pengalaman 15+ tahun. Analisa chart candlestick {asset_name} pada timeframe {tf_context['name']} dengan SANGAT TELITI.
 
 KONTEKS TIMEFRAME {tf_context['name'].upper()}:
 - Tipe Trading: {tf_context['type']}
 - Target Profit Wajar: {tf_context['tp_range']} dari harga entry
-- Stop Loss Wajar: {tf_context['sl_range']} dari harga entry
+- Stop Loss Wajar: {tf_context['sl_range']} dari harga entry (Gunakan 1.5-2x ATR untuk presisi)
 - Estimasi Waktu Hold: {tf_context['hold_time']}
 - Volatilitas: {tf_context['volatility']}
 - Keandalan Sinyal: {tf_context['reliability']}
-- Rasio Risk:Reward yang Diharapkan: {tf_context['rr_ratio']}
+- Rasio Risk:Reward Minimal: {tf_context['rr_ratio']}
 - Horizon Prediksi: {tf_context['next_candle']} ({tf_context['prediction_horizon']})
+{confluence_context}
+INDIKATOR PADA CHART (5 Panel):
+1. Panel Utama - Price Action:
+   - EMA 20 (biru) - tren jangka pendek
+   - EMA 50 (orange) - tren jangka menengah  
+   - EMA 200 (merah tebal) - tren jangka panjang PENTING
+   - Bollinger Bands (ungu putus-putus) - volatilitas dan overbought/oversold
+   - Fibonacci Retracement (kuning-orange) - level support/resistance kunci
 
-INDIKATOR PADA CHART:
-- EMA 20 (biru) dan EMA 50 (orange) - untuk identifikasi tren
-- Bollinger Bands (ungu, garis putus-putus) - untuk volatilitas dan level overbought/oversold
-- Fibonacci Retracement (garis kuning-orange) - untuk level support/resistance
-- RSI (panel bawah pertama) - dengan level 70 (overbought) dan 30 (oversold)
-- MACD (panel bawah kedua) - dengan histogram hijau (bullish) dan merah (bearish)
+2. Panel RSI (14):
+   - Level 70 = Overbought (potensi koreksi turun)
+   - Level 30 = Oversold (potensi bounce naik)
+   - Level 50 = Garis tengah (konfirmasi tren)
 
-ATURAN ANALISA:
-1. Sesuaikan jarak TP dan SL dengan karakteristik timeframe {tf_context['name']}
-2. Prediksi arah harga HARUS konsisten dengan semua indikator
-3. Jika indikator saling bertentangan, rekomendasikan TAHAN
-4. Gunakan level Fibonacci dan Bollinger Band untuk menentukan target yang realistis
-5. Pastikan rasio Risk:Reward minimal 1:1.5 untuk sinyal BELI/JUAL
-6. Berikan prediksi spesifik untuk {tf_context['next_candle']} berdasarkan momentum saat ini
+3. Panel Stochastic RSI:
+   - Garis K (biru) dan D (orange)
+   - Level 80 = Overbought ekstrem
+   - Level 20 = Oversold ekstrem
+   - Cross bullish/bearish = sinyal entry
 
-Berikan analisa dalam format berikut (Bahasa Indonesia):
+4. Panel MACD:
+   - MACD line (biru) vs Signal line (merah)
+   - Histogram hijau = momentum bullish
+   - Histogram merah = momentum bearish
+   - Crossover = sinyal penting
 
-PREDIKSI {tf_context['next_candle'].upper()}: [NAIK/TURUN/SIDEWAYS] - Keyakinan [Tinggi/Sedang/Rendah] - [Alasan singkat berdasarkan indikator]
-PERKIRAAN PERGERAKAN: Dalam {tf_context['prediction_horizon']}, harga diperkirakan [naik/turun/bergerak sideways] menuju [target harga]
-SINYAL: [BELI/JUAL/TAHAN] - [Alasan berdasarkan minimal 2 indikator]
-HARGA SAAT INI: [Harga terakhir yang terlihat di chart]
-HARGA MASUK: [Harga entry optimal]
-TARGET PROFIT 1: [Target pertama - jarak wajar untuk timeframe {tf_context['name']}]
-TARGET PROFIT 2: [Target kedua - lebih ambisius tapi realistis]
-STOP LOSS: [Harga SL berdasarkan support/resistance terdekat]
-RASIO RR: [Risk:Reward ratio, misal 1:2]
+METODOLOGI ANALISA MULTI-KONFLUENSI:
+1. TREN PRIMER: Tentukan arah tren dari EMA20/50/200 dan posisi harga relatif
+2. MOMENTUM: Konfirmasi dengan RSI, Stochastic RSI, dan MACD
+3. DIVERGENCE: Perhatikan RSI/MACD divergence untuk sinyal reversal
+4. VOLATILITAS: Gunakan Bollinger Bands dan ATR untuk placement SL/TP
+5. SUPPORT/RESISTANCE: Kombinasikan Fibonacci dengan high/low sebelumnya
+6. KONFIRMASI: Minimal 3 dari 5 indikator harus setuju untuk sinyal kuat
+
+ATURAN KETAT:
+- Jika ADX < 20: Pasar ranging, JANGAN trade melawan batas range
+- Jika RSI > 70 DAN Stoch RSI > 80: SANGAT OVERBOUGHT, risiko koreksi tinggi
+- Jika RSI < 30 DAN Stoch RSI < 20: SANGAT OVERSOLD, potensi bounce
+- Jika ada Divergence: Prioritaskan sinyal divergence di atas indikator lain
+- Jika harga di bawah EMA200: Tren primer bearish, hati-hati long
+- Jika harga di atas EMA200: Tren primer bullish, hati-hati short
+- Pastikan RR minimal 1:2 untuk setiap trade
+
+Berikan analisa dalam format LENGKAP berikut (Bahasa Indonesia):
+
+PREDIKSI {tf_context['next_candle'].upper()}: [NAIK/TURUN/SIDEWAYS] - Keyakinan [Tinggi/Sedang/Rendah] - [Alasan spesifik berdasarkan 2-3 indikator utama]
+
+PERKIRAAN PERGERAKAN: Dalam {tf_context['prediction_horizon']}, harga diperkirakan [naik/turun/sideways] dari [harga saat ini] menuju [target spesifik] dengan probabilitas [persentase berdasarkan konfluensi]
+
+SINYAL: [STRONG BUY/BUY/HOLD/SELL/STRONG SELL] - [Penjelasan mengapa, sebutkan minimal 3 indikator pendukung]
+
+KEKUATAN SINYAL: [X dari 8 indikator mendukung] - [daftar indikator yang setuju]
+
+HARGA SAAT INI: [Harga terakhir dari chart - HARUS AKURAT]
+HARGA MASUK IDEAL: [Harga entry optimal - bisa sama dengan harga saat ini atau tunggu pullback]
+
+TARGET PROFIT 1: [TP1 dengan persentase dari entry - target konservatif]
+TARGET PROFIT 2: [TP2 dengan persentase dari entry - target moderat]  
+TARGET PROFIT 3: [TP3 dengan persentase dari entry - target ambisius jika tren kuat]
+
+STOP LOSS: [Harga SL berdasarkan ATR dan support/resistance - WAJIB dengan jarak yang jelas]
+RASIO RR: [Risk:Reward ratio yang tepat, minimal 1:2]
+POTENSI PROFIT: [Persentase potensi profit jika TP1 tercapai]
+POTENSI LOSS: [Persentase potensi loss jika SL terkena]
+
 WAKTU HOLD: {tf_context['hold_time']}
-POLA: [Pola candlestick yang terlihat]
-TREN: [Tren saat ini berdasarkan EMA: Naik Kuat/Naik Lemah/Turun Kuat/Turun Lemah/Sideways]
-RSI: [Nilai dan kondisi: Overbought(>70)/Netral(30-70)/Oversold(<30)]
-MACD: [Bullish Crossover/Bearish Crossover/Momentum Positif/Momentum Negatif/Netral]
-BOLLINGER: [Di atas Upper Band/Di Middle Band/Di bawah Lower Band/Squeeze]
-FIBONACCI: [Level Fib terdekat dan signifikansinya]
-SUPPORT: [Level support 1 dan 2]
-RESISTANCE: [Level resistance 1 dan 2]
-KONFIRMASI: [Berapa indikator yang mendukung sinyal: X dari 5]
-KESIMPULAN: Dalam {tf_context['next_candle']}, harga {asset_name} diprediksi [NAIK/TURUN/SIDEWAYS] karena [alasan utama]. [Tambahan konteks 1-2 kalimat]
 
-PENTING: Berikan angka SPESIFIK dan REALISTIS berdasarkan chart. Target profit harus dalam range {tf_context['tp_range']} sesuai timeframe {tf_context['name']}. Prediksi HARUS menyebutkan arah pergerakan untuk {tf_context['next_candle']}."""
+ANALISA TEKNIKAL DETAIL:
+POLA CANDLESTICK: [Pola yang teridentifikasi dan implikasinya]
+TREN EMA: [Posisi EMA20 vs EMA50 vs EMA200 dan maknanya]
+KONDISI RSI: [Nilai RSI, kondisi, dan apakah ada divergence]
+KONDISI STOCH RSI: [Nilai K/D, cross, dan kondisi overbought/oversold]
+KONDISI MACD: [Posisi MACD vs Signal, histogram, dan momentum]
+POSISI BOLLINGER: [Dimana harga relatif terhadap BB dan apakah ada squeeze]
+LEVEL FIBONACCI: [Level Fib aktif saat ini dan target berikutnya]
+
+SUPPORT KUNCI:
+- S1: [Level support pertama - terdekat]
+- S2: [Level support kedua]
+- S3: [Level support kuat jika breakdown]
+
+RESISTANCE KUNCI:
+- R1: [Level resistance pertama - terdekat]
+- R2: [Level resistance kedua]
+- R3: [Level resistance kuat jika breakout]
+
+PERINGATAN RISIKO: [Sebutkan skenario yang bisa membatalkan analisa ini]
+
+KESIMPULAN: Dalam {tf_context['next_candle']}, harga {asset_name} diprediksi [NAIK/TURUN/SIDEWAYS] dengan keyakinan [tinggi/sedang/rendah] karena [alasan utama 2-3 kalimat yang jelas dan spesifik berdasarkan konfluensi indikator].
+
+CATATAN: Berikan angka SPESIFIK dan PRESISI berdasarkan chart. JANGAN menebak - baca nilai dari chart dengan teliti. Target dan SL harus REALISTIS sesuai timeframe {tf_context['name']}."""
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     
@@ -917,17 +1434,17 @@ PENTING: Berikan angka SPESIFIK dan REALISTIS berdasarkan chart. Target profit h
             ]
         }],
         "generationConfig": {
-            "temperature": 0.3,
-            "topP": 0.8,
-            "maxOutputTokens": 1024
+            "temperature": 0.2,
+            "topP": 0.85,
+            "maxOutputTokens": 2048
         }
     }
     
     headers = {"Content-Type": "application/json"}
     
     try:
-        log_analysis(f"Menganalisa {symbol} dengan AI...")
-        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=60)
+        log_analysis(f"Menganalisa {symbol} dengan AI (Enhanced)...")
+        response = requests.post(url, headers=headers, data=json.dumps(payload), timeout=90)
         
         if response.status_code == 200:
             result = response.json()
@@ -937,7 +1454,7 @@ PENTING: Berikan angka SPESIFIK dan REALISTIS berdasarkan chart. Target profit h
                 if "content" in candidate and "parts" in candidate["content"]:
                     text = candidate["content"]["parts"][0].get("text", "")
                     if text:
-                        log_success(f"Analisa {symbol} selesai")
+                        log_success(f"Analisa {symbol} selesai (Enhanced)")
                         return text
             
             return "Format respons Gemini tidak sesuai. Coba lagi."
@@ -978,25 +1495,31 @@ def format_analysis_reply(text):
                       'prediksi 1 jam', 'prediksi 4 jam', 'prediksi 1 hari', 'prediksi 1 minggu',
                       'prediksi arah', 'prediksi'], 'emoji': '🔮', 'group': 'prediction'},
         {'keywords': ['perkiraan pergerakan', 'perkiraan'], 'emoji': '📍', 'group': 'prediction'},
-        {'keywords': ['sinyal', 'signal'], 'emoji': '📊', 'group': 'signal'},
+        {'keywords': ['sinyal', 'signal', 'kekuatan sinyal'], 'emoji': '📊', 'group': 'signal'},
         {'keywords': ['harga saat ini', 'harga sekarang', 'current price'], 'emoji': '💵', 'group': 'trading'},
-        {'keywords': ['harga masuk', 'entry', 'masuk'], 'emoji': '🎯', 'group': 'trading'},
+        {'keywords': ['harga masuk ideal', 'harga masuk', 'entry', 'masuk'], 'emoji': '🎯', 'group': 'trading'},
         {'keywords': ['target profit 1', 'tp1', 'tp 1'], 'emoji': '💰', 'group': 'trading'},
         {'keywords': ['target profit 2', 'tp2', 'tp 2'], 'emoji': '💎', 'group': 'trading'},
+        {'keywords': ['target profit 3', 'tp3', 'tp 3'], 'emoji': '🏆', 'group': 'trading'},
         {'keywords': ['target profit', 'take profit', 'target'], 'emoji': '💰', 'group': 'trading'},
         {'keywords': ['stop loss', 'stoploss', 'sl'], 'emoji': '🛑', 'group': 'trading'},
         {'keywords': ['rasio rr', 'rasio risk', 'risk reward', 'rr ratio'], 'emoji': '⚖️', 'group': 'trading'},
+        {'keywords': ['potensi profit', 'potensi keuntungan'], 'emoji': '📈', 'group': 'trading'},
+        {'keywords': ['potensi loss', 'potensi rugi'], 'emoji': '📉', 'group': 'trading'},
         {'keywords': ['waktu hold', 'holding time', 'durasi'], 'emoji': '⏱️', 'group': 'trading'},
-        {'keywords': ['pola', 'pattern', 'candlestick'], 'emoji': '🕯️', 'group': 'analysis'},
-        {'keywords': ['tren', 'trend'], 'emoji': '📈', 'group': 'analysis'},
-        {'keywords': ['rsi'], 'emoji': '📉', 'group': 'indicators'},
-        {'keywords': ['macd'], 'emoji': '📊', 'group': 'indicators'},
-        {'keywords': ['bollinger', 'bb'], 'emoji': '〰️', 'group': 'indicators'},
-        {'keywords': ['fibonacci', 'fib'], 'emoji': '🔢', 'group': 'indicators'},
-        {'keywords': ['support', 's1', 's2'], 'emoji': '🔻', 'group': 'levels'},
-        {'keywords': ['resistance', 'r1', 'r2'], 'emoji': '🔺', 'group': 'levels'},
+        {'keywords': ['pola candlestick', 'pola', 'pattern', 'candlestick'], 'emoji': '🕯️', 'group': 'analysis'},
+        {'keywords': ['tren ema', 'tren', 'trend'], 'emoji': '📈', 'group': 'analysis'},
+        {'keywords': ['kondisi rsi', 'rsi'], 'emoji': '📉', 'group': 'indicators'},
+        {'keywords': ['kondisi stoch', 'stoch rsi', 'stochastic'], 'emoji': '📊', 'group': 'indicators'},
+        {'keywords': ['kondisi macd', 'macd'], 'emoji': '📊', 'group': 'indicators'},
+        {'keywords': ['posisi bollinger', 'bollinger', 'bb'], 'emoji': '〰️', 'group': 'indicators'},
+        {'keywords': ['level fibonacci', 'fibonacci', 'fib'], 'emoji': '🔢', 'group': 'indicators'},
+        {'keywords': ['support kunci', 'support', 's1', 's2', 's3'], 'emoji': '🔻', 'group': 'levels'},
+        {'keywords': ['resistance kunci', 'resistance', 'r1', 'r2', 'r3'], 'emoji': '🔺', 'group': 'levels'},
         {'keywords': ['konfirmasi', 'confirmation'], 'emoji': '✅', 'group': 'confirmation'},
+        {'keywords': ['peringatan risiko', 'peringatan', 'risiko', 'warning'], 'emoji': '⚠️', 'group': 'warning'},
         {'keywords': ['kesimpulan', 'conclusion', 'ringkasan'], 'emoji': '🧠', 'group': 'conclusion'},
+        {'keywords': ['analisa teknikal detail', 'analisa teknikal'], 'emoji': '📋', 'group': 'analysis'},
     ]
     
     sections = {
@@ -1007,6 +1530,7 @@ def format_analysis_reply(text):
         'indicators': [],
         'levels': [],
         'confirmation': [],
+        'warning': [],
         'conclusion': [],
         'other': []
     }
@@ -1072,6 +1596,11 @@ def format_analysis_reply(text):
             result_parts.append('')
         result_parts.append('─── Konfirmasi Sinyal ───')
         result_parts.append('\n\n'.join(sections['confirmation']))
+    if sections['warning']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Peringatan ───')
+        result_parts.append('\n\n'.join(sections['warning']))
     if sections['conclusion']:
         if result_parts:
             result_parts.append('')
@@ -1207,23 +1736,26 @@ def get_after_analysis_keyboard(symbol, market_type):
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /start"""
-    welcome_text = """📊 *Bot Analisa Teknikal Trading*
+    welcome_text = """📊 *Bot Analisa Teknikal Pro*
 ━━━━━━━━━━━━━━━━━━━━
 
-Selamat datang! Bot ini menyediakan analisa teknikal menggunakan AI untuk:
+Selamat datang! Bot ini menyediakan analisa teknikal PROFESSIONAL menggunakan AI untuk:
 
 💰 *Cryptocurrency* - 14 koin populer
    BTC, ETH, SOL, BNB, XRP, dan lainnya
 
 💱 *Forex & Komoditas* - 16 pasangan
-   Emas, Perak, EUR/USD, GBP/USD, dan lainnya
+   Emas (XAUUSD), Perak, EUR/USD, GBP/USD, dll
 
-*Fitur:*
-• Chart candlestick real-time
-• Indikator: EMA, RSI, MACD, Bollinger Bands
+*Fitur Analisa Pro:*
+• 8+ Indikator Teknikal (EMA, RSI, MACD, BB, Stoch RSI)
+• Sistem Konfluensi Multi-Indikator
+• Deteksi Divergence RSI & MACD
+• ADX (Kekuatan Tren) & ATR (Volatilitas)
 • Fibonacci Retracement
-• Analisa AI dengan Gemini Vision
-• Sinyal BELI/JUAL/TAHAN
+• Analisa AI Gemini Vision Enhanced
+• Sinyal STRONG BUY/BUY/HOLD/SELL/STRONG SELL
+• 3 Level Target Profit + Stop Loss Optimal
 
 ━━━━━━━━━━━━━━━━━━━━
 *Pilih pasar untuk memulai:*"""
@@ -1396,11 +1928,11 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=status_message.message_id,
-        text=f"📊 Membuat chart {info['emoji']} {symbol} ({interval})..."
+        text=f"📊 Membuat chart & menghitung konfluensi {info['emoji']} {symbol} ({interval})..."
     )
     
     filename = f"chart_{symbol}_{interval}_{int(datetime.now().timestamp())}.png"
-    chart_path = generate_chart(data, filename, symbol, interval, market_type)
+    chart_path, confluence = generate_chart_with_confluence(data, filename, symbol, interval, market_type)
     
     if not chart_path:
         await context.bot.edit_message_text(
@@ -1411,12 +1943,17 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         )
         return
     
+    confluence_summary = ""
+    if confluence:
+        signal_emoji = {"STRONG_BUY": "🟢🟢", "BUY": "🟢", "HOLD": "🟡", "SELL": "🔴", "STRONG_SELL": "🔴🔴"}.get(confluence['signal'], "⚪")
+        confluence_summary = f"\n{signal_emoji} Sinyal: {confluence['signal']} ({confluence['confidence']})"
+    
     try:
         with open(chart_path, "rb") as photo:
             if market_type == "crypto":
-                caption = f"{info['emoji']} {symbol}/USDT ({interval})"
+                caption = f"{info['emoji']} {symbol}/USDT ({interval}){confluence_summary}"
             else:
-                caption = f"{info['emoji']} {symbol} - {info['name']} ({interval})"
+                caption = f"{info['emoji']} {symbol} - {info['name']} ({interval}){confluence_summary}"
             
             photo_message = await context.bot.send_photo(
                 chat_id=chat_id,
@@ -1436,10 +1973,10 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     await context.bot.edit_message_text(
         chat_id=chat_id,
         message_id=status_message.message_id,
-        text=f"🤖 Menganalisa chart {symbol} dengan AI..."
+        text=f"🤖 Menganalisa chart {symbol} dengan AI + Konfluensi Multi-Indikator..."
     )
     
-    analysis = analyze_with_gemini(chart_path, symbol, market_type, interval)
+    analysis = analyze_with_gemini(chart_path, symbol, market_type, interval, confluence)
     formatted = format_analysis_reply(analysis)
     
     if market_type == "crypto":
@@ -1553,27 +2090,32 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Gagal mengambil data atau data terlalu sedikit.")
         return
     
-    await update.message.reply_text("📊 Membuat chart...")
+    await update.message.reply_text("📊 Membuat chart & menghitung konfluensi...")
     
     filename = f"chart_{symbol}_{interval}_{int(datetime.now().timestamp())}.png"
-    chart_path = generate_chart(data, filename, symbol, interval, market_type)
+    chart_path, confluence = generate_chart_with_confluence(data, filename, symbol, interval, market_type)
     
     if not chart_path:
         await update.message.reply_text("❌ Gagal membuat chart.")
         return
     
+    confluence_summary = ""
+    if confluence:
+        signal_emoji = {"STRONG_BUY": "🟢🟢", "BUY": "🟢", "HOLD": "🟡", "SELL": "🔴", "STRONG_SELL": "🔴🔴"}.get(confluence['signal'], "⚪")
+        confluence_summary = f"\n{signal_emoji} Sinyal: {confluence['signal']} ({confluence['confidence']})"
+    
     with open(chart_path, "rb") as photo:
         if market_type == "crypto":
-            caption = f"{info['emoji']} {symbol}/USDT ({interval})\n⏳ Menganalisa..."
+            caption = f"{info['emoji']} {symbol}/USDT ({interval}){confluence_summary}\n⏳ Menganalisa dengan AI..."
         else:
-            caption = f"{info['emoji']} {symbol} ({interval})\n⏳ Menganalisa..."
+            caption = f"{info['emoji']} {symbol} ({interval}){confluence_summary}\n⏳ Menganalisa dengan AI..."
         await update.message.reply_photo(photo=photo, caption=caption)
     
-    analysis = analyze_with_gemini(chart_path, symbol, market_type, interval)
+    analysis = analyze_with_gemini(chart_path, symbol, market_type, interval, confluence)
     formatted = format_analysis_reply(analysis)
     
     await update.message.reply_text(
-        f"{info['emoji']} Hasil Analisa {symbol} ({interval}):\n\n{formatted}\n\n"
+        f"{info['emoji']} Hasil Analisa Pro {symbol} ({interval}):\n\n{formatted}\n\n"
         "⚠️ Peringatan: Ini bukan saran keuangan.",
         reply_markup=get_after_analysis_keyboard(symbol, market_type)
     )
@@ -1638,7 +2180,7 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     crypto_list = ", ".join(SUPPORTED_COINS.keys())
     forex_list = ", ".join(FOREX_PAIRS.keys())
     
-    help_text = f"""📖 *Panduan Penggunaan Bot*
+    help_text = f"""📖 *Panduan Penggunaan Bot Analisa Pro*
 
 *Perintah:*
 /start - Mulai bot dan pilih pasar
@@ -1660,13 +2202,21 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 *Timeframe:*
 1min, 5min, 15min, 30min, 1hour, 4hour, 1day, 1week
 
-*Fitur:*
-• Chart candlestick dengan EMA20 & EMA50
-• Bollinger Bands & Fibonacci
-• Indikator RSI dan MACD
-• Analisa AI menggunakan Gemini Vision
-• Sinyal BELI/JUAL/TAHAN
-• Harga masuk, Target Profit, Stop Loss
+*Fitur Analisa Pro:*
+• Chart dengan 8+ Indikator Teknikal
+• EMA 20, EMA 50, EMA 200 (Tren Multi-Timeframe)
+• Bollinger Bands & Fibonacci Retracement
+• RSI (14) dengan level 30/50/70
+• Stochastic RSI (lebih sensitif)
+• MACD dengan Histogram
+• Sistem Konfluensi Multi-Indikator
+• Deteksi RSI & MACD Divergence
+• ADX untuk Kekuatan Tren
+• ATR untuk Volatilitas & Penentuan SL/TP
+• Analisa AI Gemini Vision Enhanced
+• Sinyal STRONG BUY/BUY/HOLD/SELL/STRONG SELL
+• 3 Level Target Profit
+• Support & Resistance Multi-Level
 
 *Sumber Data:*
 • TradingView - Data candlestick historical
