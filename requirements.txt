@@ -29,3 +29,4 @@ telegram
 websocket-client
 xnoxs-fetcher
 yfinance
+python-telegram-bot[job-queue]
