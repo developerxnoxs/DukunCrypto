@@ -1298,18 +1298,25 @@ def analyze_with_gemini(image_path, symbol, market_type="crypto", interval="1hou
         bullish_details = "\n  - ".join(confluence['signal_details']['bullish'][:5]) if confluence['signal_details']['bullish'] else "Tidak ada"
         bearish_details = "\n  - ".join(confluence['signal_details']['bearish'][:5]) if confluence['signal_details']['bearish'] else "Tidak ada"
         
+        ema200_str = f"{confluence['ema200']:.4f}" if confluence['ema200'] else "N/A"
+        adx_status = "(Tren Kuat)" if confluence['adx'] > 25 else "(Tren Lemah)"
+        rsi_status = "(Overbought - Potensi Turun)" if confluence['rsi'] > 70 else "(Oversold - Potensi Naik)" if confluence['rsi'] < 30 else "(Netral)"
+        stoch_status = "(Overbought)" if confluence['stoch_rsi'] > 80 else "(Oversold)" if confluence['stoch_rsi'] < 20 else "(Netral)"
+        rsi_div_status = "(Sinyal Reversal Kuat!)" if confluence['rsi_divergence'] != 'none' else ""
+        macd_div_status = "(Sinyal Reversal Kuat!)" if confluence['macd_divergence'] != 'none' else ""
+        
         confluence_context = f"""
 DATA ANALISA KUANTITATIF (SUDAH DIHITUNG):
 - Sinyal Sistem: {confluence['signal']} (Keyakinan: {confluence['confidence']})
 - Skor Bullish: {confluence['bullish_pct']:.1f}% | Skor Bearish: {confluence['bearish_pct']:.1f}%
 - Arah Tren: {confluence['trend_direction']} | Kekuatan Tren: {confluence['trend_strength']}
-- ADX (Kekuatan Tren): {confluence['adx']:.1f} {'(Tren Kuat)' if confluence['adx'] > 25 else '(Tren Lemah)'}
-- RSI: {confluence['rsi']:.1f} {'(Overbought - Potensi Turun)' if confluence['rsi'] > 70 else '(Oversold - Potensi Naik)' if confluence['rsi'] < 30 else '(Netral)'}
-- Stochastic RSI: {confluence['stoch_rsi']:.1f} {'(Overbought)' if confluence['stoch_rsi'] > 80 else '(Oversold)' if confluence['stoch_rsi'] < 20 else '(Netral)'}
+- ADX (Kekuatan Tren): {confluence['adx']:.1f} {adx_status}
+- RSI: {confluence['rsi']:.1f} {rsi_status}
+- Stochastic RSI: {confluence['stoch_rsi']:.1f} {stoch_status}
 - ATR (Volatilitas): {confluence['atr']:.4f} ({confluence['atr_pct']:.2f}% dari harga)
-- RSI Divergence: {confluence['rsi_divergence'].upper()} {'(Sinyal Reversal Kuat!)' if confluence['rsi_divergence'] != 'none' else ''}
-- MACD Divergence: {confluence['macd_divergence'].upper()} {'(Sinyal Reversal Kuat!)' if confluence['macd_divergence'] != 'none' else ''}
-- EMA20: {confluence['ema20']:.4f} | EMA50: {confluence['ema50']:.4f} | EMA200: {confluence['ema200']:.4f if confluence['ema200'] else 'N/A'}
+- RSI Divergence: {confluence['rsi_divergence'].upper()} {rsi_div_status}
+- MACD Divergence: {confluence['macd_divergence'].upper()} {macd_div_status}
+- EMA20: {confluence['ema20']:.4f} | EMA50: {confluence['ema50']:.4f} | EMA200: {ema200_str}
 - Bollinger Upper: {confluence['bb_upper']:.4f} | Middle: {confluence['bb_middle']:.4f} | Lower: {confluence['bb_lower']:.4f}
 - MACD: {confluence['macd']:.6f} | Signal: {confluence['macd_signal']:.6f} | Histogram: {confluence['macd_hist']:.6f}
 
