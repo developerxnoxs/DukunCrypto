@@ -1521,7 +1521,7 @@ def extract_signal_from_analysis(text):
 
 
 def format_analysis_reply(text):
-    """Format hasil analisa menjadi lebih mudah dibaca"""
+    """Format hasil analisa menjadi lebih mudah dibaca dengan kode blok"""
     if not text or text.startswith("Error") or text.startswith("Timeout"):
         return text
     
@@ -1530,56 +1530,34 @@ def format_analysis_reply(text):
     text_clean = re.sub(r'`([^`]+)`', r'\1', text_clean)
     text_clean = re.sub(r'^\s*[-•]\s*', '', text_clean, flags=re.MULTILINE)
     
-    section_keywords = [
-        {'keywords': ['prediksi 1 menit', 'prediksi 5 menit', 'prediksi 15 menit', 'prediksi 30 menit', 
-                      'prediksi 1 jam', 'prediksi 4 jam', 'prediksi 1 hari', 'prediksi 1 minggu',
-                      'prediksi arah', 'prediksi'], 'emoji': '🔮', 'group': 'prediction'},
-        {'keywords': ['perkiraan pergerakan', 'perkiraan'], 'emoji': '📍', 'group': 'prediction'},
-        {'keywords': ['sinyal', 'signal', 'kekuatan sinyal'], 'emoji': '📊', 'group': 'signal'},
-        {'keywords': ['harga saat ini', 'harga sekarang', 'current price'], 'emoji': '💵', 'group': 'trading'},
-        {'keywords': ['harga masuk ideal', 'harga masuk', 'entry', 'masuk'], 'emoji': '🎯', 'group': 'trading'},
-        {'keywords': ['target profit 1', 'tp1', 'tp 1'], 'emoji': '💰', 'group': 'trading'},
-        {'keywords': ['target profit 2', 'tp2', 'tp 2'], 'emoji': '💎', 'group': 'trading'},
-        {'keywords': ['target profit 3', 'tp3', 'tp 3'], 'emoji': '🏆', 'group': 'trading'},
-        {'keywords': ['target profit', 'take profit', 'target'], 'emoji': '💰', 'group': 'trading'},
-        {'keywords': ['stop loss', 'stoploss', 'sl'], 'emoji': '🛑', 'group': 'trading'},
-        {'keywords': ['rasio rr', 'rasio risk', 'risk reward', 'rr ratio'], 'emoji': '⚖️', 'group': 'trading'},
-        {'keywords': ['potensi profit', 'potensi keuntungan'], 'emoji': '📈', 'group': 'trading'},
-        {'keywords': ['potensi loss', 'potensi rugi'], 'emoji': '📉', 'group': 'trading'},
-        {'keywords': ['waktu hold', 'holding time', 'durasi'], 'emoji': '⏱️', 'group': 'trading'},
-        {'keywords': ['pola candlestick', 'pola', 'pattern', 'candlestick'], 'emoji': '🕯️', 'group': 'analysis'},
-        {'keywords': ['tren ema', 'tren', 'trend'], 'emoji': '📈', 'group': 'analysis'},
-        {'keywords': ['kondisi rsi', 'rsi'], 'emoji': '📉', 'group': 'indicators'},
-        {'keywords': ['kondisi stoch', 'stoch rsi', 'stochastic'], 'emoji': '📊', 'group': 'indicators'},
-        {'keywords': ['kondisi macd', 'macd'], 'emoji': '📊', 'group': 'indicators'},
-        {'keywords': ['posisi bollinger', 'bollinger', 'bb'], 'emoji': '〰️', 'group': 'indicators'},
-        {'keywords': ['level fibonacci', 'fibonacci', 'fib'], 'emoji': '🔢', 'group': 'indicators'},
-        {'keywords': ['support kunci', 'support', 's1', 's2', 's3'], 'emoji': '🔻', 'group': 'levels'},
-        {'keywords': ['resistance kunci', 'resistance', 'r1', 'r2', 'r3'], 'emoji': '🔺', 'group': 'levels'},
-        {'keywords': ['konfirmasi', 'confirmation'], 'emoji': '✅', 'group': 'confirmation'},
-        {'keywords': ['peringatan risiko', 'peringatan', 'risiko', 'warning'], 'emoji': '⚠️', 'group': 'warning'},
-        {'keywords': ['kesimpulan', 'conclusion', 'ringkasan'], 'emoji': '🧠', 'group': 'conclusion'},
-        {'keywords': ['analisa teknikal detail', 'analisa teknikal'], 'emoji': '📋', 'group': 'analysis'},
-    ]
-    
-    sections = {
-        'prediction': [],
-        'signal': [],
-        'trading': [],
-        'analysis': [],
-        'indicators': [],
-        'levels': [],
-        'confirmation': [],
-        'warning': [],
-        'conclusion': [],
-        'other': []
+    section_config = {
+        'signal': {'title': '📊 SINYAL', 'keywords': ['sinyal', 'signal', 'kekuatan sinyal']},
+        'prediction': {'title': '🔮 PREDIKSI', 'keywords': ['prediksi', 'perkiraan', 'arah']},
+        'entry': {'title': '🎯 ENTRY', 'keywords': ['harga masuk', 'entry', 'masuk ideal']},
+        'tp': {'title': '💰 TARGET PROFIT', 'keywords': ['target profit', 'tp1', 'tp2', 'tp3', 'tp 1', 'tp 2', 'tp 3', 'take profit']},
+        'sl': {'title': '🛑 STOP LOSS', 'keywords': ['stop loss', 'stoploss', 'sl']},
+        'rr': {'title': '⚖️ RISK/REWARD', 'keywords': ['rasio rr', 'risk reward', 'rr ratio', 'rasio risk']},
+        'support': {'title': '🔻 SUPPORT', 'keywords': ['support', 's1', 's2', 's3']},
+        'resistance': {'title': '🔺 RESISTANCE', 'keywords': ['resistance', 'r1', 'r2', 'r3']},
+        'trend': {'title': '📈 TREN', 'keywords': ['tren', 'trend']},
+        'rsi': {'title': '📉 RSI', 'keywords': ['rsi', 'kondisi rsi']},
+        'macd': {'title': '📊 MACD', 'keywords': ['macd', 'kondisi macd']},
+        'stoch': {'title': '📊 STOCHASTIC', 'keywords': ['stoch', 'stochastic']},
+        'bb': {'title': '〰️ BOLLINGER', 'keywords': ['bollinger', 'bb', 'posisi bollinger']},
+        'fib': {'title': '🔢 FIBONACCI', 'keywords': ['fibonacci', 'fib', 'level fib']},
+        'pattern': {'title': '🕯️ POLA', 'keywords': ['pola', 'pattern', 'candlestick']},
+        'warning': {'title': '⚠️ PERINGATAN', 'keywords': ['peringatan', 'risiko', 'warning']},
+        'conclusion': {'title': '🧠 KESIMPULAN', 'keywords': ['kesimpulan', 'conclusion', 'ringkasan']},
     }
+    
+    sections = {k: [] for k in section_config}
+    sections['other'] = []
     
     lines = text_clean.strip().split('\n')
     
     for line in lines:
         line = line.strip()
-        if not line:
+        if not line or len(line) < 3:
             continue
         
         if ':' in line:
@@ -1591,63 +1569,79 @@ def format_analysis_reply(text):
                 continue
             
             matched = False
-            for config in section_keywords:
+            for section_key, config in section_config.items():
                 for keyword in config['keywords']:
                     if keyword in key:
-                        sections[config['group']].append(f"{config['emoji']} *{parts[0].strip().upper()}:*\n{value}")
+                        sections[section_key].append(value)
                         matched = True
                         break
                 if matched:
                     break
             
             if not matched and value and len(value) > 3:
-                sections['other'].append(f"• {parts[0].strip()}: {value}")
+                sections['other'].append(f"{parts[0].strip()}: {value}")
     
-    result_parts = []
-    if sections['prediction']:
-        result_parts.append('─── Prediksi Harga ───')
-        result_parts.append('\n\n'.join(sections['prediction']))
+    result_lines = []
+    
     if sections['signal']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('\n\n'.join(sections['signal']))
-    if sections['trading']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('─── Setup Trading ───')
-        result_parts.append('\n\n'.join(sections['trading']))
-    if sections['levels']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('─── Support & Resistance ───')
-        result_parts.append('\n\n'.join(sections['levels']))
-    if sections['analysis']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('─── Analisa Teknikal ───')
-        result_parts.append('\n\n'.join(sections['analysis']))
-    if sections['indicators']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('─── Indikator ───')
-        result_parts.append('\n\n'.join(sections['indicators']))
-    if sections['confirmation']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('─── Konfirmasi Sinyal ───')
-        result_parts.append('\n\n'.join(sections['confirmation']))
-    if sections['warning']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('─── Peringatan ───')
-        result_parts.append('\n\n'.join(sections['warning']))
-    if sections['conclusion']:
-        if result_parts:
-            result_parts.append('')
-        result_parts.append('─── Kesimpulan ───')
-        result_parts.append('\n\n'.join(sections['conclusion']))
+        result_lines.append(f"📊 *SINYAL:* `{sections['signal'][0]}`")
     
-    return '\n'.join(result_parts) if result_parts else text
+    if sections['prediction']:
+        result_lines.append(f"🔮 *PREDIKSI:* `{sections['prediction'][0]}`")
+    
+    if sections['entry'] or sections['tp'] or sections['sl']:
+        result_lines.append("")
+        result_lines.append("```")
+        result_lines.append("╔══════ SETUP TRADING ══════╗")
+        if sections['entry']:
+            result_lines.append(f"  Entry    : {sections['entry'][0]}")
+        for i, tp in enumerate(sections['tp'], 1):
+            result_lines.append(f"  TP{i}      : {tp}")
+        if sections['sl']:
+            result_lines.append(f"  SL       : {sections['sl'][0]}")
+        if sections['rr']:
+            result_lines.append(f"  R:R      : {sections['rr'][0]}")
+        result_lines.append("╚═══════════════════════════╝")
+        result_lines.append("```")
+    
+    if sections['support'] or sections['resistance']:
+        result_lines.append("")
+        result_lines.append("```")
+        result_lines.append("╔══ SUPPORT & RESISTANCE ═══╗")
+        for i, s in enumerate(sections['support'], 1):
+            result_lines.append(f"  S{i}       : {s}")
+        for i, r in enumerate(sections['resistance'], 1):
+            result_lines.append(f"  R{i}       : {r}")
+        result_lines.append("╚═══════════════════════════╝")
+        result_lines.append("```")
+    
+    indicator_lines = []
+    if sections['trend']:
+        indicator_lines.append(f"📈 Tren: `{sections['trend'][0]}`")
+    if sections['rsi']:
+        indicator_lines.append(f"📉 RSI: `{sections['rsi'][0]}`")
+    if sections['macd']:
+        indicator_lines.append(f"📊 MACD: `{sections['macd'][0]}`")
+    if sections['stoch']:
+        indicator_lines.append(f"📊 Stoch: `{sections['stoch'][0]}`")
+    if sections['bb']:
+        indicator_lines.append(f"〰️ BB: `{sections['bb'][0]}`")
+    if sections['pattern']:
+        indicator_lines.append(f"🕯️ Pola: `{sections['pattern'][0]}`")
+    
+    if indicator_lines:
+        result_lines.append("")
+        result_lines.extend(indicator_lines)
+    
+    if sections['warning']:
+        result_lines.append("")
+        result_lines.append(f"⚠️ *Peringatan:* _{sections['warning'][0]}_")
+    
+    if sections['conclusion']:
+        result_lines.append("")
+        result_lines.append(f"🧠 *Kesimpulan:* {sections['conclusion'][0]}")
+    
+    return '\n'.join(result_lines) if result_lines else text
 
 
 def get_main_menu_keyboard():
