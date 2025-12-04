@@ -1487,6 +1487,43 @@ CATATAN: Berikan angka SPESIFIK dan PRESISI berdasarkan chart. JANGAN menebak - 
         return f"Error: {e}"
 
 
+def extract_signal_from_analysis(text):
+    """Mengekstrak sinyal trading dari hasil analisa Gemini"""
+    if not text or text.startswith("Error") or text.startswith("Timeout"):
+        return None, None
+    
+    text_upper = text.upper()
+    
+    signal_patterns = [
+        (r'SINYAL[:\s]*\[?(STRONG[\s_]?BUY)\]?', 'STRONG_BUY'),
+        (r'SINYAL[:\s]*\[?(STRONG[\s_]?SELL)\]?', 'STRONG_SELL'),
+        (r'SINYAL[:\s]*\[?(BUY)\]?', 'BUY'),
+        (r'SINYAL[:\s]*\[?(SELL)\]?', 'SELL'),
+        (r'SINYAL[:\s]*\[?(HOLD)\]?', 'HOLD'),
+        (r'SIGNAL[:\s]*\[?(STRONG[\s_]?BUY)\]?', 'STRONG_BUY'),
+        (r'SIGNAL[:\s]*\[?(STRONG[\s_]?SELL)\]?', 'STRONG_SELL'),
+        (r'SIGNAL[:\s]*\[?(BUY)\]?', 'BUY'),
+        (r'SIGNAL[:\s]*\[?(SELL)\]?', 'SELL'),
+        (r'SIGNAL[:\s]*\[?(HOLD)\]?', 'HOLD'),
+    ]
+    
+    for pattern, signal in signal_patterns:
+        match = re.search(pattern, text_upper)
+        if match:
+            signal_emoji = {
+                "STRONG_BUY": "🟢🟢", 
+                "BUY": "🟢", 
+                "HOLD": "🟡", 
+                "SELL": "🔴", 
+                "STRONG_SELL": "🔴🔴"
+            }.get(signal, "⚪")
+            
+            signal_display = signal.replace("_", " ")
+            return signal, f"{signal_emoji} Sinyal AI: {signal_display}"
+    
+    return None, None
+
+
 def format_analysis_reply(text):
     """Format hasil analisa menjadi lebih mudah dibaca"""
     if not text or text.startswith("Error") or text.startswith("Timeout"):
@@ -1950,17 +1987,12 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         )
         return
     
-    confluence_summary = ""
-    if confluence:
-        signal_emoji = {"STRONG_BUY": "🟢🟢", "BUY": "🟢", "HOLD": "🟡", "SELL": "🔴", "STRONG_SELL": "🔴🔴"}.get(confluence['signal'], "⚪")
-        confluence_summary = f"\n{signal_emoji} Sinyal: {confluence['signal']} ({confluence['confidence']})"
-    
     try:
         with open(chart_path, "rb") as photo:
             if market_type == "crypto":
-                caption = f"{info['emoji']} {symbol}/USDT ({interval}){confluence_summary}"
+                caption = f"{info['emoji']} {symbol}/USDT ({interval})\n⏳ Menganalisa dengan AI..."
             else:
-                caption = f"{info['emoji']} {symbol} - {info['name']} ({interval}){confluence_summary}"
+                caption = f"{info['emoji']} {symbol} - {info['name']} ({interval})\n⏳ Menganalisa dengan AI..."
             
             photo_message = await context.bot.send_photo(
                 chat_id=chat_id,
@@ -1985,6 +2017,23 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
     
     analysis = analyze_with_gemini(chart_path, symbol, market_type, interval, confluence)
     formatted = format_analysis_reply(analysis)
+    
+    signal_code, signal_text = extract_signal_from_analysis(analysis)
+    
+    if signal_text:
+        try:
+            if market_type == "crypto":
+                new_caption = f"{info['emoji']} {symbol}/USDT ({interval})\n{signal_text}"
+            else:
+                new_caption = f"{info['emoji']} {symbol} - {info['name']} ({interval})\n{signal_text}"
+            
+            await context.bot.edit_message_caption(
+                chat_id=chat_id,
+                message_id=photo_message.message_id,
+                caption=new_caption
+            )
+        except Exception as e:
+            logger.warning(f"Gagal update caption chart: {e}")
     
     if market_type == "crypto":
         result_text = f"""{info['emoji']} *Hasil Analisa {symbol}/USDT ({interval})*
@@ -2106,20 +2155,32 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Gagal membuat chart.")
         return
     
-    confluence_summary = ""
-    if confluence:
-        signal_emoji = {"STRONG_BUY": "🟢🟢", "BUY": "🟢", "HOLD": "🟡", "SELL": "🔴", "STRONG_SELL": "🔴🔴"}.get(confluence['signal'], "⚪")
-        confluence_summary = f"\n{signal_emoji} Sinyal: {confluence['signal']} ({confluence['confidence']})"
-    
     with open(chart_path, "rb") as photo:
         if market_type == "crypto":
-            caption = f"{info['emoji']} {symbol}/USDT ({interval}){confluence_summary}\n⏳ Menganalisa dengan AI..."
+            caption = f"{info['emoji']} {symbol}/USDT ({interval})\n⏳ Menganalisa dengan AI..."
         else:
-            caption = f"{info['emoji']} {symbol} ({interval}){confluence_summary}\n⏳ Menganalisa dengan AI..."
-        await update.message.reply_photo(photo=photo, caption=caption)
+            caption = f"{info['emoji']} {symbol} ({interval})\n⏳ Menganalisa dengan AI..."
+        photo_msg = await update.message.reply_photo(photo=photo, caption=caption)
     
     analysis = analyze_with_gemini(chart_path, symbol, market_type, interval, confluence)
     formatted = format_analysis_reply(analysis)
+    
+    signal_code, signal_text = extract_signal_from_analysis(analysis)
+    
+    if signal_text:
+        try:
+            if market_type == "crypto":
+                new_caption = f"{info['emoji']} {symbol}/USDT ({interval})\n{signal_text}"
+            else:
+                new_caption = f"{info['emoji']} {symbol} ({interval})\n{signal_text}"
+            
+            await context.bot.edit_message_caption(
+                chat_id=update.message.chat_id,
+                message_id=photo_msg.message_id,
+                caption=new_caption
+            )
+        except Exception as e:
+            logger.warning(f"Gagal update caption chart: {e}")
     
     await update.message.reply_text(
         f"{info['emoji']} Hasil Analisa Pro {symbol} ({interval}):\n\n{formatted}\n\n"

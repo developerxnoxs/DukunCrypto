@@ -169,6 +169,14 @@ GEMINI_API_KEY=AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## Perubahan Terbaru
 
+- 2024-12-04: **v3.1 - Signal Consistency Fix**
+  - Memperbaiki masalah sinyal yang tidak konsisten antara caption chart dan analisa Gemini
+  - Caption chart sekarang menampilkan "Menganalisa dengan AI..." saat proses analisa
+  - Setelah Gemini selesai menganalisa, caption chart diupdate dengan sinyal dari hasil AI
+  - Menambahkan fungsi extract_signal_from_analysis() untuk mengekstrak sinyal dari respons Gemini
+  - Menghapus sinyal confluence dari caption chart untuk menghindari kebingungan
+  - Caption chart sekarang selalu sinkron dengan hasil analisa Gemini AI
+
 - 2024-12-04: **v3.0 - Enhanced Analysis System**
   - Menambahkan EMA200 untuk identifikasi tren jangka panjang
   - Menambahkan Stochastic RSI untuk momentum sensitif
