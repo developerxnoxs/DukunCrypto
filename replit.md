@@ -55,6 +55,27 @@ Layout profesional 4-panel dengan rasio 6:2:2:2:
 3. Indikator RSI
 4. Indikator MACD
 
+## Analisa Berbasis Timeframe (v2.0)
+
+Prompt analisa AI disesuaikan berdasarkan timeframe untuk memberikan target yang lebih realistis:
+
+| Timeframe | Tipe Trading | Target Profit | Stop Loss | Waktu Hold |
+|-----------|--------------|---------------|-----------|------------|
+| 1min | Scalping | 0.1% - 0.3% | 0.05% - 0.15% | 1-15 menit |
+| 5min | Scalping | 0.2% - 0.5% | 0.1% - 0.25% | 5-30 menit |
+| 15min | Intraday | 0.3% - 0.8% | 0.15% - 0.4% | 15 menit - 2 jam |
+| 30min | Intraday | 0.5% - 1.2% | 0.25% - 0.6% | 30 menit - 4 jam |
+| 1hour | Swing Trading | 1% - 2.5% | 0.5% - 1.2% | 2-24 jam |
+| 4hour | Swing Trading | 2% - 5% | 1% - 2.5% | 1-7 hari |
+| 1day | Position Trading | 3% - 10% | 1.5% - 5% | 3-30 hari |
+| 1week | Position/Investment | 5% - 20% | 3% - 10% | 2-12 minggu |
+
+**Fitur Baru dalam Output Analisa:**
+- PREDIKSI ARAH: Naik/Turun/Sideways dengan tingkat keyakinan
+- RASIO RR: Risk:Reward ratio untuk evaluasi trade
+- WAKTU HOLD: Estimasi durasi berdasarkan timeframe
+- KONFIRMASI: Jumlah indikator yang mendukung sinyal (X dari 5)
+
 ## Konfigurasi Environment
 
 Bot mengambil konfigurasi dari file `.env` atau environment variables.

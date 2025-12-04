@@ -201,29 +201,45 @@ def analyze_chart(image_bytes: bytes, prompt: str) -> str:
     return response.json()['candidates'][0]['content']['parts'][0]['text']
 ```
 
-### Prompt Structure
+### Prompt Structure (Timeframe-Aware)
 
-```python
-ANALYSIS_PROMPT = """
-Analyze this {symbol} chart on {timeframe} timeframe.
+Bot menggunakan prompt yang disesuaikan berdasarkan timeframe untuk menghasilkan analisa yang lebih akurat.
 
-Technical indicators shown:
-- EMA20 (blue) and EMA50 (orange)
-- Bollinger Bands (purple dashed)
-- Fibonacci Retracement levels
-- RSI (14-period) with 70/30 levels
-- MACD (12/26/9) with histogram
+**Konfigurasi Timeframe:**
 
-Provide analysis including:
-1. SINYAL (BUY/SELL/HOLD) with reasoning
-2. ENTRY price
-3. TAKE PROFIT 1 and TAKE PROFIT 2
-4. STOP LOSS
-5. Pattern recognition
-6. Trend analysis
-7. Support and Resistance levels
-8. Summary
-"""
+| Timeframe | Tipe Trading | Target Profit | Stop Loss | Hold Time |
+|-----------|--------------|---------------|-----------|-----------|
+| 1min | Scalping | 0.1% - 0.3% | 0.05% - 0.15% | 1-15 menit |
+| 5min | Scalping | 0.2% - 0.5% | 0.1% - 0.25% | 5-30 menit |
+| 15min | Intraday | 0.3% - 0.8% | 0.15% - 0.4% | 15 menit - 2 jam |
+| 30min | Intraday | 0.5% - 1.2% | 0.25% - 0.6% | 30 menit - 4 jam |
+| 1hour | Swing Trading | 1% - 2.5% | 0.5% - 1.2% | 2-24 jam |
+| 4hour | Swing Trading | 2% - 5% | 1% - 2.5% | 1-7 hari |
+| 1day | Position Trading | 3% - 10% | 1.5% - 5% | 3-30 hari |
+| 1week | Position/Investment | 5% - 20% | 3% - 10% | 2-12 minggu |
+
+**Output Format:**
+
+```
+PREDIKSI ARAH: [NAIK/TURUN/SIDEWAYS] - [Keyakinan: Tinggi/Sedang/Rendah]
+SINYAL: [BELI/JUAL/TAHAN] - [Alasan]
+HARGA SAAT INI: [Harga terakhir]
+HARGA MASUK: [Entry optimal]
+TARGET PROFIT 1: [TP1 sesuai timeframe]
+TARGET PROFIT 2: [TP2 lebih ambisius]
+STOP LOSS: [SL berdasarkan support/resistance]
+RASIO RR: [Risk:Reward ratio]
+WAKTU HOLD: [Estimasi durasi]
+POLA: [Pola candlestick]
+TREN: [Naik Kuat/Naik Lemah/Turun Kuat/Turun Lemah/Sideways]
+RSI: [Nilai dan kondisi]
+MACD: [Kondisi MACD]
+BOLLINGER: [Posisi terhadap band]
+FIBONACCI: [Level terdekat]
+SUPPORT: [S1 dan S2]
+RESISTANCE: [R1 dan R2]
+KONFIRMASI: [X dari 5 indikator]
+KESIMPULAN: [Ringkasan 2-3 kalimat]
 ```
 
 ## Telegram Bot Handlers

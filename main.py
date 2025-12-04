@@ -725,10 +725,101 @@ def generate_chart(data, filename="chart.png", symbol="BTC", tf="15min", market_
         return None
 
 
-def analyze_with_gemini(image_path, symbol, market_type="crypto"):
-    """Analisa chart menggunakan Gemini Vision API"""
+def get_timeframe_context(interval):
+    """Mendapatkan konteks berdasarkan timeframe untuk analisa yang lebih akurat"""
+    timeframe_configs = {
+        "1min": {
+            "name": "1 Menit",
+            "type": "Scalping",
+            "tp_range": "0.1% - 0.3%",
+            "sl_range": "0.05% - 0.15%",
+            "hold_time": "1-15 menit",
+            "volatility": "sangat tinggi",
+            "reliability": "rendah (noise tinggi)",
+            "rr_ratio": "1:1 hingga 1:2"
+        },
+        "5min": {
+            "name": "5 Menit",
+            "type": "Scalping",
+            "tp_range": "0.2% - 0.5%",
+            "sl_range": "0.1% - 0.25%",
+            "hold_time": "5-30 menit",
+            "volatility": "tinggi",
+            "reliability": "rendah-sedang",
+            "rr_ratio": "1:1.5 hingga 1:2"
+        },
+        "15min": {
+            "name": "15 Menit",
+            "type": "Intraday",
+            "tp_range": "0.3% - 0.8%",
+            "sl_range": "0.15% - 0.4%",
+            "hold_time": "15 menit - 2 jam",
+            "volatility": "sedang-tinggi",
+            "reliability": "sedang",
+            "rr_ratio": "1:1.5 hingga 1:2.5"
+        },
+        "30min": {
+            "name": "30 Menit",
+            "type": "Intraday",
+            "tp_range": "0.5% - 1.2%",
+            "sl_range": "0.25% - 0.6%",
+            "hold_time": "30 menit - 4 jam",
+            "volatility": "sedang",
+            "reliability": "sedang-baik",
+            "rr_ratio": "1:2 hingga 1:3"
+        },
+        "1hour": {
+            "name": "1 Jam",
+            "type": "Swing Trading",
+            "tp_range": "1% - 2.5%",
+            "sl_range": "0.5% - 1.2%",
+            "hold_time": "2-24 jam",
+            "volatility": "sedang",
+            "reliability": "baik",
+            "rr_ratio": "1:2 hingga 1:3"
+        },
+        "4hour": {
+            "name": "4 Jam",
+            "type": "Swing Trading",
+            "tp_range": "2% - 5%",
+            "sl_range": "1% - 2.5%",
+            "hold_time": "1-7 hari",
+            "volatility": "sedang-rendah",
+            "reliability": "baik-sangat baik",
+            "rr_ratio": "1:2 hingga 1:4"
+        },
+        "1day": {
+            "name": "Harian",
+            "type": "Position Trading",
+            "tp_range": "3% - 10%",
+            "sl_range": "1.5% - 5%",
+            "hold_time": "3-30 hari",
+            "volatility": "rendah",
+            "reliability": "sangat baik",
+            "rr_ratio": "1:2 hingga 1:5"
+        },
+        "1week": {
+            "name": "Mingguan",
+            "type": "Position/Investment",
+            "tp_range": "5% - 20%",
+            "sl_range": "3% - 10%",
+            "hold_time": "2-12 minggu",
+            "volatility": "sangat rendah",
+            "reliability": "sangat baik (tren utama)",
+            "rr_ratio": "1:2 hingga 1:5"
+        }
+    }
+    return timeframe_configs.get(interval, timeframe_configs["1hour"])
+
+
+def analyze_with_gemini(image_path, symbol, market_type="crypto", interval="1hour"):
+    """Analisa chart menggunakan Gemini Vision API dengan konteks timeframe"""
     if not GEMINI_API_KEY:
         return "GEMINI_API_KEY tidak ditemukan. Silakan set environment variable terlebih dahulu."
+    
+    if interval not in INTERVAL_MAP:
+        logger.warning(f"Interval tidak valid: {interval}, menggunakan default 1hour")
+        interval = "1hour"
     
     try:
         with open(image_path, "rb") as f:
@@ -745,32 +836,56 @@ def analyze_with_gemini(image_path, symbol, market_type="crypto"):
         pair_info = FOREX_PAIRS.get(symbol, {"name": symbol})
         asset_name = f"{symbol} ({pair_info.get('name', symbol)})"
 
-    prompt = f"""Analisa chart candlestick {asset_name} ini secara teknikal. 
+    tf_context = get_timeframe_context(interval)
 
-Chart ini memiliki indikator:
-- EMA 20 (biru) dan EMA 50 (orange)
-- Bollinger Bands (ungu, garis putus-putus)
-- Fibonacci Retracement (garis kuning-orange)
-- RSI (panel bawah pertama, dengan garis overbought 70 dan oversold 30)
-- MACD (panel bawah kedua, dengan histogram hijau/merah)
+    prompt = f"""Kamu adalah analis teknikal profesional. Analisa chart candlestick {asset_name} pada timeframe {tf_context['name']} ini.
 
-Berikan analisa dalam format berikut (dalam Bahasa Indonesia):
+KONTEKS TIMEFRAME {tf_context['name'].upper()}:
+- Tipe Trading: {tf_context['type']}
+- Target Profit Wajar: {tf_context['tp_range']} dari harga entry
+- Stop Loss Wajar: {tf_context['sl_range']} dari harga entry
+- Estimasi Waktu Hold: {tf_context['hold_time']}
+- Volatilitas: {tf_context['volatility']}
+- Keandalan Sinyal: {tf_context['reliability']}
+- Rasio Risk:Reward yang Diharapkan: {tf_context['rr_ratio']}
 
-SINYAL: [BELI/JUAL/TAHAN] - [Alasan singkat]
-HARGA MASUK: [Harga entry yang disarankan]
-TARGET PROFIT: [Target TP1] dan [Target TP2]
-STOP LOSS: [Harga SL yang disarankan]
-POLA: [Pola candlestick yang terlihat, misalnya: Bullish Engulfing, Doji, Hammer, dll]
-TREN: [Tren saat ini: Naik/Turun/Sideways]
-RSI: [Nilai RSI dan kondisi: Overbought/Oversold/Netral]
-MACD: [Kondisi MACD: Bullish Crossover/Bearish Crossover/Momentum positif/negatif]
-BOLLINGER: [Posisi harga terhadap Bollinger Bands: Band Atas/Tengah/Bawah]
-FIBONACCI: [Level Fibonacci terdekat yang signifikan]
-SUPPORT: [Level support terdekat]
-RESISTANCE: [Level resistance terdekat]
-KESIMPULAN: [Ringkasan analisa dalam 2-3 kalimat berdasarkan semua indikator]
+INDIKATOR PADA CHART:
+- EMA 20 (biru) dan EMA 50 (orange) - untuk identifikasi tren
+- Bollinger Bands (ungu, garis putus-putus) - untuk volatilitas dan level overbought/oversold
+- Fibonacci Retracement (garis kuning-orange) - untuk level support/resistance
+- RSI (panel bawah pertama) - dengan level 70 (overbought) dan 30 (oversold)
+- MACD (panel bawah kedua) - dengan histogram hijau (bullish) dan merah (bearish)
 
-Berikan angka spesifik berdasarkan chart yang terlihat. Jika tidak bisa menentukan harga pasti, berikan estimasi range."""
+ATURAN ANALISA:
+1. Sesuaikan jarak TP dan SL dengan karakteristik timeframe {tf_context['name']}
+2. Prediksi arah harga HARUS konsisten dengan semua indikator
+3. Jika indikator saling bertentangan, rekomendasikan TAHAN
+4. Gunakan level Fibonacci dan Bollinger Band untuk menentukan target yang realistis
+5. Pastikan rasio Risk:Reward minimal 1:1.5 untuk sinyal BELI/JUAL
+
+Berikan analisa dalam format berikut (Bahasa Indonesia):
+
+PREDIKSI ARAH: [NAIK/TURUN/SIDEWAYS] - [Persentase keyakinan: Tinggi/Sedang/Rendah]
+SINYAL: [BELI/JUAL/TAHAN] - [Alasan berdasarkan minimal 2 indikator]
+HARGA SAAT INI: [Harga terakhir yang terlihat di chart]
+HARGA MASUK: [Harga entry optimal]
+TARGET PROFIT 1: [Target pertama - jarak wajar untuk timeframe {tf_context['name']}]
+TARGET PROFIT 2: [Target kedua - lebih ambisius tapi realistis]
+STOP LOSS: [Harga SL berdasarkan support/resistance terdekat]
+RASIO RR: [Risk:Reward ratio, misal 1:2]
+WAKTU HOLD: [Estimasi waktu berdasarkan timeframe]
+POLA: [Pola candlestick yang terlihat]
+TREN: [Tren saat ini berdasarkan EMA: Naik Kuat/Naik Lemah/Turun Kuat/Turun Lemah/Sideways]
+RSI: [Nilai dan kondisi: Overbought(>70)/Netral(30-70)/Oversold(<30)]
+MACD: [Bullish Crossover/Bearish Crossover/Momentum Positif/Momentum Negatif/Netral]
+BOLLINGER: [Di atas Upper Band/Di Middle Band/Di bawah Lower Band/Squeeze]
+FIBONACCI: [Level Fib terdekat dan signifikansinya]
+SUPPORT: [Level support 1 dan 2]
+RESISTANCE: [Level resistance 1 dan 2]
+KONFIRMASI: [Berapa indikator yang mendukung sinyal: X dari 5]
+KESIMPULAN: [Ringkasan 2-3 kalimat yang menjelaskan mengapa prediksi ini masuk akal untuk timeframe {tf_context['name']}]
+
+PENTING: Berikan angka SPESIFIK dan REALISTIS berdasarkan chart. Target profit harus dalam range {tf_context['tp_range']} sesuai timeframe {tf_context['name']}."""
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
     
@@ -840,27 +955,36 @@ def format_analysis_reply(text):
     text_clean = re.sub(r'^\s*[-•]\s*', '', text_clean, flags=re.MULTILINE)
     
     section_keywords = [
+        {'keywords': ['prediksi arah', 'prediksi'], 'emoji': '🔮', 'group': 'prediction'},
         {'keywords': ['sinyal', 'signal'], 'emoji': '📊', 'group': 'signal'},
+        {'keywords': ['harga saat ini', 'harga sekarang', 'current price'], 'emoji': '💵', 'group': 'trading'},
         {'keywords': ['harga masuk', 'entry', 'masuk'], 'emoji': '🎯', 'group': 'trading'},
-        {'keywords': ['target profit', 'take profit', 'target', 'tp1', 'tp2', 'tp 1', 'tp 2'], 'emoji': '💰', 'group': 'trading'},
+        {'keywords': ['target profit 1', 'tp1', 'tp 1'], 'emoji': '💰', 'group': 'trading'},
+        {'keywords': ['target profit 2', 'tp2', 'tp 2'], 'emoji': '💎', 'group': 'trading'},
+        {'keywords': ['target profit', 'take profit', 'target'], 'emoji': '💰', 'group': 'trading'},
         {'keywords': ['stop loss', 'stoploss', 'sl'], 'emoji': '🛑', 'group': 'trading'},
+        {'keywords': ['rasio rr', 'rasio risk', 'risk reward', 'rr ratio'], 'emoji': '⚖️', 'group': 'trading'},
+        {'keywords': ['waktu hold', 'holding time', 'durasi'], 'emoji': '⏱️', 'group': 'trading'},
         {'keywords': ['pola', 'pattern', 'candlestick'], 'emoji': '🕯️', 'group': 'analysis'},
-        {'keywords': ['tren', 'trend', 'arah'], 'emoji': '📈', 'group': 'analysis'},
+        {'keywords': ['tren', 'trend'], 'emoji': '📈', 'group': 'analysis'},
         {'keywords': ['rsi'], 'emoji': '📉', 'group': 'indicators'},
         {'keywords': ['macd'], 'emoji': '📊', 'group': 'indicators'},
         {'keywords': ['bollinger', 'bb'], 'emoji': '〰️', 'group': 'indicators'},
         {'keywords': ['fibonacci', 'fib'], 'emoji': '🔢', 'group': 'indicators'},
         {'keywords': ['support', 's1', 's2'], 'emoji': '🔻', 'group': 'levels'},
         {'keywords': ['resistance', 'r1', 'r2'], 'emoji': '🔺', 'group': 'levels'},
+        {'keywords': ['konfirmasi', 'confirmation'], 'emoji': '✅', 'group': 'confirmation'},
         {'keywords': ['kesimpulan', 'conclusion', 'ringkasan'], 'emoji': '🧠', 'group': 'conclusion'},
     ]
     
     sections = {
+        'prediction': [],
         'signal': [],
         'trading': [],
         'analysis': [],
         'indicators': [],
         'levels': [],
+        'confirmation': [],
         'conclusion': [],
         'other': []
     }
@@ -894,7 +1018,12 @@ def format_analysis_reply(text):
                 sections['other'].append(f"• {parts[0].strip()}: {value}")
     
     result_parts = []
+    if sections['prediction']:
+        result_parts.append('─── Prediksi Harga ───')
+        result_parts.append('\n\n'.join(sections['prediction']))
     if sections['signal']:
+        if result_parts:
+            result_parts.append('')
         result_parts.append('\n\n'.join(sections['signal']))
     if sections['trading']:
         if result_parts:
@@ -916,6 +1045,11 @@ def format_analysis_reply(text):
             result_parts.append('')
         result_parts.append('─── Indikator ───')
         result_parts.append('\n\n'.join(sections['indicators']))
+    if sections['confirmation']:
+        if result_parts:
+            result_parts.append('')
+        result_parts.append('─── Konfirmasi Sinyal ───')
+        result_parts.append('\n\n'.join(sections['confirmation']))
     if sections['conclusion']:
         if result_parts:
             result_parts.append('')
@@ -1283,7 +1417,7 @@ async def handle_timeframe_callback(update: Update, context: ContextTypes.DEFAUL
         text=f"🤖 Menganalisa chart {symbol} dengan AI..."
     )
     
-    analysis = analyze_with_gemini(chart_path, symbol, market_type)
+    analysis = analyze_with_gemini(chart_path, symbol, market_type, interval)
     formatted = format_analysis_reply(analysis)
     
     if market_type == "crypto":
@@ -1413,7 +1547,7 @@ async def cmd_analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
             caption = f"{info['emoji']} {symbol} ({interval})\n⏳ Menganalisa..."
         await update.message.reply_photo(photo=photo, caption=caption)
     
-    analysis = analyze_with_gemini(chart_path, symbol, market_type)
+    analysis = analyze_with_gemini(chart_path, symbol, market_type, interval)
     formatted = format_analysis_reply(analysis)
     
     await update.message.reply_text(
