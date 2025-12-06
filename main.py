@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Bot Analisa Teknikal Trading - Crypto & Forex
+Bot Analisa Teknikal Trading - Crypto & Forex + Auto-Trading MT5
 Tool CLI untuk analisa teknikal menggunakan Telegram Bot dan Gemini AI Vision
+Dengan fitur Auto-Trading menggunakan MetaTrader5
 Mendukung: Cryptocurrency (14 koin) dan Forex/Komoditas (16 pasangan)
 """
 
@@ -22,6 +23,20 @@ import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
+
+try:
+    from src.mt5_trader import (
+        MT5Trader, AutoTrader, TradeSignal, TradeAction, 
+        TradeResult, parse_analysis_signal
+    )
+    MT5_TRADING_AVAILABLE = True
+except ImportError:
+    MT5_TRADING_AVAILABLE = False
+    MT5Trader = None
+    AutoTrader = None
+
+mt5_trader = None
+auto_trader = None
 
 
 class Colors:
