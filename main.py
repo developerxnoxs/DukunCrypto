@@ -2282,6 +2282,365 @@ async def cmd_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ Simbol tidak valid: {symbol}")
 
 
+async def cmd_mt5status(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /mt5status - Cek status koneksi MetaTrader5"""
+    if not update.message:
+        return
+    
+    global mt5_trader
+    
+    if not MT5_TRADING_AVAILABLE:
+        await update.message.reply_text(
+            "❌ *Modul Auto-Trading tidak tersedia*\n\n"
+            "MetaTrader5 library tidak terinstall.\n"
+            "Fitur ini hanya tersedia di Windows atau Docker dengan Wine.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    if mt5_trader is None:
+        await update.message.reply_text(
+            "⚠️ *MT5 Trader belum diinisialisasi*\n\n"
+            "Pastikan variabel environment MT5 sudah diset:\n"
+            "• MT5_LOGIN\n"
+            "• MT5_PASSWORD\n"
+            "• MT5_SERVER",
+            parse_mode='Markdown'
+        )
+        return
+    
+    if not mt5_trader.connected:
+        success = mt5_trader.initialize()
+        if not success:
+            await update.message.reply_text(
+                "❌ *Gagal terhubung ke MetaTrader5*\n\n"
+                "Periksa kredensial dan koneksi internet.",
+                parse_mode='Markdown'
+            )
+            return
+    
+    account = mt5_trader.get_account_info()
+    if account:
+        trading_status = "🟢 AKTIF" if mt5_trader.enable_trading else "🔴 NONAKTIF"
+        await update.message.reply_text(
+            f"✅ *Status MetaTrader5*\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🔗 *Koneksi:* Terhubung\n"
+            f"🏦 *Server:* {account.get('server', 'N/A')}\n"
+            f"👤 *Login:* {account.get('login', 'N/A')}\n"
+            f"💰 *Balance:* ${account.get('balance', 0):,.2f}\n"
+            f"📊 *Equity:* ${account.get('equity', 0):,.2f}\n"
+            f"📈 *Profit:* ${account.get('profit', 0):,.2f}\n"
+            f"⚖️ *Leverage:* 1:{account.get('leverage', 0)}\n"
+            f"💵 *Free Margin:* ${account.get('margin_free', 0):,.2f}\n\n"
+            f"🤖 *Auto-Trading:* {trading_status}\n"
+            f"⚠️ *Risk per Trade:* {mt5_trader.risk_percent}%\n"
+            f"📊 *Max Positions:* {mt5_trader.max_positions}",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(
+            "❌ *Gagal mengambil info akun*\n\n"
+            "Koneksi terputus atau ada masalah.",
+            parse_mode='Markdown'
+        )
+
+
+async def cmd_positions(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /positions - Lihat posisi terbuka"""
+    if not update.message:
+        return
+    
+    global mt5_trader
+    
+    if not MT5_TRADING_AVAILABLE or mt5_trader is None:
+        await update.message.reply_text(
+            "❌ *Auto-Trading tidak tersedia*\n"
+            "Gunakan /mt5status untuk cek status.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    if not mt5_trader.connected:
+        mt5_trader.initialize()
+    
+    positions = mt5_trader.get_positions()
+    
+    if not positions:
+        await update.message.reply_text(
+            "📊 *Posisi Terbuka*\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "Tidak ada posisi terbuka saat ini.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    total_profit = sum(p['profit'] for p in positions)
+    profit_emoji = "🟢" if total_profit >= 0 else "🔴"
+    
+    msg = f"📊 *Posisi Terbuka ({len(positions)})*\n"
+    msg += f"━━━━━━━━━━━━━━━━━━━━\n\n"
+    
+    for pos in positions:
+        pos_emoji = "🟢" if pos['profit'] >= 0 else "🔴"
+        direction = "📈 LONG" if pos['type'] == 'BUY' else "📉 SHORT"
+        msg += f"*#{pos['ticket']}* - {pos['symbol']}\n"
+        msg += f"  {direction} | Vol: {pos['volume']}\n"
+        msg += f"  Entry: {pos['price_open']:.5f}\n"
+        msg += f"  Current: {pos['price_current']:.5f}\n"
+        msg += f"  SL: {pos['sl']:.5f} | TP: {pos['tp']:.5f}\n"
+        msg += f"  {pos_emoji} P/L: ${pos['profit']:,.2f}\n\n"
+    
+    msg += f"━━━━━━━━━━━━━━━━━━━━\n"
+    msg += f"{profit_emoji} *Total P/L:* ${total_profit:,.2f}"
+    
+    await update.message.reply_text(msg, parse_mode='Markdown')
+
+
+async def cmd_close(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /close [ticket] - Tutup posisi"""
+    if not update.message:
+        return
+    
+    global mt5_trader
+    
+    if not MT5_TRADING_AVAILABLE or mt5_trader is None:
+        await update.message.reply_text(
+            "❌ *Auto-Trading tidak tersedia*",
+            parse_mode='Markdown'
+        )
+        return
+    
+    args = context.args or []
+    
+    if len(args) < 1:
+        await update.message.reply_text(
+            "📖 *Cara Penggunaan:*\n"
+            "/close <ticket_number>\n\n"
+            "*Contoh:*\n"
+            "/close 12345678\n\n"
+            "Gunakan /positions untuk melihat daftar posisi.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    try:
+        ticket = int(args[0])
+    except ValueError:
+        await update.message.reply_text("❌ Ticket harus berupa angka.")
+        return
+    
+    if not mt5_trader.connected:
+        mt5_trader.initialize()
+    
+    if not mt5_trader.enable_trading:
+        await update.message.reply_text(
+            "⚠️ *Trading dinonaktifkan*\n\n"
+            "Auto-trading dalam mode read-only.\n"
+            "Set MT5_ENABLE_TRADING=true untuk mengaktifkan.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    await update.message.reply_text(f"⏳ Menutup posisi #{ticket}...")
+    
+    result = mt5_trader.close_position(ticket)
+    
+    if result.success:
+        await update.message.reply_text(
+            f"✅ *Posisi Ditutup*\n\n"
+            f"Ticket: #{ticket}\n"
+            f"Symbol: {result.symbol}\n"
+            f"Price: {result.executed_price:.5f}\n"
+            f"Volume: {result.volume}",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(
+            f"❌ *Gagal Menutup Posisi*\n\n"
+            f"{result.message}",
+            parse_mode='Markdown'
+        )
+
+
+async def cmd_trade(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /trade - Eksekusi trade manual"""
+    if not update.message:
+        return
+    
+    global mt5_trader
+    
+    if not MT5_TRADING_AVAILABLE or mt5_trader is None:
+        await update.message.reply_text(
+            "❌ *Auto-Trading tidak tersedia*",
+            parse_mode='Markdown'
+        )
+        return
+    
+    args = context.args or []
+    
+    if len(args) < 3:
+        await update.message.reply_text(
+            "📖 *Cara Penggunaan:*\n"
+            "/trade <BUY/SELL> <SYMBOL> <VOLUME>\n\n"
+            "*Contoh:*\n"
+            "/trade BUY BTCUSD 0.01\n"
+            "/trade SELL XAUUSD 0.1\n\n"
+            "*Opsional dengan SL/TP:*\n"
+            "/trade BUY EURUSD 0.1 1.0800 1.1000\n"
+            "(format: action symbol volume sl tp)",
+            parse_mode='Markdown'
+        )
+        return
+    
+    action = args[0].upper()
+    symbol = args[1].upper()
+    
+    try:
+        volume = float(args[2])
+    except ValueError:
+        await update.message.reply_text("❌ Volume harus berupa angka.")
+        return
+    
+    sl = float(args[3]) if len(args) > 3 else 0
+    tp = float(args[4]) if len(args) > 4 else 0
+    
+    if action not in ['BUY', 'SELL']:
+        await update.message.reply_text("❌ Action harus BUY atau SELL.")
+        return
+    
+    if not mt5_trader.connected:
+        mt5_trader.initialize()
+    
+    if not mt5_trader.enable_trading:
+        await update.message.reply_text(
+            "⚠️ *Trading dinonaktifkan*\n\n"
+            "Auto-trading dalam mode read-only.\n"
+            "Set MT5_ENABLE_TRADING=true untuk mengaktifkan.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    symbol_info = mt5_trader.get_symbol_info(symbol)
+    if not symbol_info:
+        await update.message.reply_text(f"❌ Symbol {symbol} tidak tersedia di broker.")
+        return
+    
+    current_price = symbol_info['ask'] if action == 'BUY' else symbol_info['bid']
+    
+    if sl == 0:
+        sl = current_price * 0.98 if action == 'BUY' else current_price * 1.02
+    if tp == 0:
+        tp = current_price * 1.03 if action == 'BUY' else current_price * 0.97
+    
+    from src.mt5_trader import TradeSignal, TradeAction
+    
+    signal = TradeSignal(
+        symbol=symbol,
+        action=TradeAction.BUY if action == 'BUY' else TradeAction.SELL,
+        entry_price=current_price,
+        stop_loss=sl,
+        take_profit_1=tp,
+        confidence=100.0,
+        reason="Manual trade via Telegram"
+    )
+    
+    await update.message.reply_text(
+        f"⏳ *Eksekusi Order...*\n\n"
+        f"Action: {action}\n"
+        f"Symbol: {symbol}\n"
+        f"Volume: {volume}\n"
+        f"Price: {current_price:.5f}\n"
+        f"SL: {sl:.5f}\n"
+        f"TP: {tp:.5f}",
+        parse_mode='Markdown'
+    )
+    
+    result = mt5_trader.execute_trade(signal, volume=volume)
+    
+    if result.success:
+        await update.message.reply_text(
+            f"✅ *Order Berhasil!*\n\n"
+            f"Order ID: #{result.order_id}\n"
+            f"Symbol: {result.symbol}\n"
+            f"Action: {result.action}\n"
+            f"Volume: {result.volume}\n"
+            f"Price: {result.executed_price:.5f}",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(
+            f"❌ *Order Gagal*\n\n"
+            f"{result.message}",
+            parse_mode='Markdown'
+        )
+
+
+async def cmd_autotrade(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handler untuk command /autotrade - Toggle auto-trading"""
+    if not update.message:
+        return
+    
+    global mt5_trader, auto_trader
+    
+    if not MT5_TRADING_AVAILABLE or mt5_trader is None:
+        await update.message.reply_text(
+            "❌ *Auto-Trading tidak tersedia*",
+            parse_mode='Markdown'
+        )
+        return
+    
+    args = context.args or []
+    
+    if len(args) < 1:
+        status = "AKTIF" if (auto_trader and auto_trader.auto_execute) else "NONAKTIF"
+        await update.message.reply_text(
+            f"🤖 *Status Auto-Trade*\n\n"
+            f"Auto-execute: {status}\n\n"
+            f"*Cara Penggunaan:*\n"
+            f"/autotrade on - Aktifkan auto-trading\n"
+            f"/autotrade off - Nonaktifkan auto-trading\n\n"
+            f"⚠️ Saat aktif, sinyal BUY/SELL dari analisa\n"
+            f"akan otomatis dieksekusi ke MT5.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    command = args[0].lower()
+    
+    if command == 'on':
+        if auto_trader:
+            auto_trader.auto_execute = True
+            mt5_trader.enable_trading = True
+            await update.message.reply_text(
+                "✅ *Auto-Trading Diaktifkan*\n\n"
+                "Sinyal trading dari analisa akan\n"
+                "otomatis dieksekusi ke MetaTrader5.\n\n"
+                "⚠️ Gunakan dengan bijak!",
+                parse_mode='Markdown'
+            )
+        else:
+            await update.message.reply_text(
+                "❌ AutoTrader belum diinisialisasi.",
+                parse_mode='Markdown'
+            )
+    elif command == 'off':
+        if auto_trader:
+            auto_trader.auto_execute = False
+        await update.message.reply_text(
+            "🔴 *Auto-Trading Dinonaktifkan*\n\n"
+            "Sinyal trading hanya akan ditampilkan,\n"
+            "tidak akan dieksekusi otomatis.",
+            parse_mode='Markdown'
+        )
+    else:
+        await update.message.reply_text(
+            "❌ Perintah tidak valid.\n"
+            "Gunakan: /autotrade on atau /autotrade off",
+            parse_mode='Markdown'
+        )
+
+
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handler untuk command /help"""
     if not update.message:
@@ -2290,18 +2649,28 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     crypto_list = ", ".join(SUPPORTED_COINS.keys())
     forex_list = ", ".join(FOREX_PAIRS.keys())
     
+    mt5_status = "Tersedia" if MT5_TRADING_AVAILABLE else "Tidak Tersedia"
+    
     help_text = f"""📖 *Panduan Penggunaan Bot Analisa Pro*
 
-*Perintah:*
+*Perintah Analisa:*
 /start - Mulai bot dan pilih pasar
 /analyze <simbol> <tf> - Analisa langsung
 /price <simbol> - Lihat harga terkini
 /help - Tampilkan bantuan ini
 
+*Perintah Auto-Trading (MT5):*
+/mt5status - Cek status koneksi MT5
+/positions - Lihat posisi terbuka
+/trade <BUY/SELL> <SYMBOL> <VOL> - Trade manual
+/close <ticket> - Tutup posisi
+/autotrade on/off - Toggle auto-trading
+
 *Contoh:*
 /analyze BTC 15min
 /analyze XAUUSD 4hour
-/price ETH
+/trade BUY BTCUSD 0.01
+/close 12345678
 
 *Cryptocurrency ({len(SUPPORTED_COINS)}):*
 {crypto_list}
@@ -2327,6 +2696,12 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Sinyal STRONG BUY/BUY/HOLD/SELL/STRONG SELL
 • 3 Level Target Profit
 • Support & Resistance Multi-Level
+
+*Auto-Trading MetaTrader5:*
+• Status: {mt5_status}
+• Eksekusi order otomatis ke MT5
+• Risk management terintegrasi
+• Multi-position monitoring
 
 *Sumber Data:*
 • TradingView - Data candlestick historical
@@ -2410,6 +2785,12 @@ def setup_application():
     app.add_handler(CommandHandler("analyze", cmd_analyze))
     app.add_handler(CommandHandler("price", cmd_price))
     app.add_handler(CommandHandler("help", cmd_help))
+    
+    app.add_handler(CommandHandler("mt5status", cmd_mt5status))
+    app.add_handler(CommandHandler("positions", cmd_positions))
+    app.add_handler(CommandHandler("trade", cmd_trade))
+    app.add_handler(CommandHandler("close", cmd_close))
+    app.add_handler(CommandHandler("autotrade", cmd_autotrade))
     
     app.add_handler(CallbackQueryHandler(handle_market_callback, pattern=r'^(market_|back_to_main|ignore)'))
     app.add_handler(CallbackQueryHandler(handle_crypto_callback, pattern=r'^crypto_'))
@@ -2500,6 +2881,44 @@ def main():
     
     log_info(f"Cryptocurrency: {len(SUPPORTED_COINS)} koin didukung")
     log_info(f"Forex & Komoditas: {len(FOREX_PAIRS)} pasangan didukung")
+    
+    global mt5_trader, auto_trader
+    
+    if MT5_TRADING_AVAILABLE:
+        mt5_login = os.environ.get("MT5_LOGIN", "")
+        mt5_password = os.environ.get("MT5_PASSWORD", "")
+        mt5_server = os.environ.get("MT5_SERVER", "")
+        mt5_enable = os.environ.get("MT5_ENABLE_TRADING", "false").lower() == "true"
+        mt5_risk = float(os.environ.get("MT5_RISK_PERCENT", "1.0"))
+        mt5_max_pos = int(os.environ.get("MT5_MAX_POSITIONS", "5"))
+        
+        if mt5_login and mt5_password and mt5_server:
+            mt5_trader = MT5Trader(
+                login=int(mt5_login),
+                password=mt5_password,
+                server=mt5_server,
+                risk_percent=mt5_risk,
+                max_positions=mt5_max_pos,
+                enable_trading=mt5_enable
+            )
+            
+            if mt5_trader.initialize():
+                log_success(f"MetaTrader5: Terhubung ke {mt5_server}")
+                auto_trader = AutoTrader(
+                    trader=mt5_trader,
+                    min_confidence=60.0,
+                    auto_execute=False
+                )
+                if mt5_enable:
+                    log_warning("Auto-Trading: AKTIF (Hati-hati!)")
+                else:
+                    log_info("Auto-Trading: Read-only mode")
+            else:
+                log_warning("MetaTrader5: Gagal terhubung (akan coba saat dibutuhkan)")
+        else:
+            log_info("MetaTrader5: Kredensial tidak diset (opsional)")
+    else:
+        log_info("MetaTrader5: Library tidak tersedia")
     
     print()
     print(f"{Colors.WHITE}{Colors.BOLD}  Konfigurasi Bot Mode:{Colors.RESET}")

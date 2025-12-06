@@ -163,9 +163,127 @@ Jika webhook URL tidak terdeteksi, bot otomatis fallback ke mode polling.
 docker-compose down && docker-compose up -d --build
 ```
 
+## Auto-Trading dengan MetaTrader 5
+
+Bot mendukung auto-trading terintegrasi dengan MetaTrader 5 melalui Wine di Linux container.
+
+### Prasyarat MT5
+
+1. Akun broker yang mendukung MetaTrader 5
+2. Kredensial login MT5 (login, password, server)
+3. Instalasi MetaTrader 5 (dari Windows atau portable)
+
+### Instalasi MT5 untuk Docker
+
+MetaTrader 5 adalah software proprietary yang harus diinstal secara terpisah. Ada 2 cara:
+
+**Opsi 1: Mount dari Windows Host (Recommended)**
+
+Jika Anda menjalankan Docker di Windows dengan WSL2:
+
+```yaml
+# docker-compose.yml
+volumes:
+  - ./logs:/app/logs
+  - mt5-data:/root/.wine
+  - "C:/Program Files/MetaTrader 5:/app/mt5:ro"
+```
+
+**Opsi 2: Copy Portable MT5**
+
+1. Download MT5 dari broker Anda
+2. Install di Windows, lalu copy folder instalasi
+3. Mount folder tersebut ke container:
+
+```yaml
+volumes:
+  - ./mt5-portable:/app/mt5:ro
+```
+
+**Struktur folder MT5 yang diperlukan:**
+```
+mt5/
+├── terminal64.exe  # atau terminal.exe
+├── config/
+├── MQL5/
+└── ...
+```
+
+**Tanpa MT5 Terminal**
+
+Jika MT5 terminal tidak tersedia, bot akan berjalan dalam mode **analisa saja** tanpa fitur trading. Anda akan melihat pesan:
+```
+WARNING: MetaTrader 5 terminal not found!
+The bot will run in analysis-only mode without MT5.
+```
+
+### Environment Variables MT5
+
+| Variable | Deskripsi | Default |
+|----------|-----------|---------|
+| `MT5_LOGIN` | Nomor akun MT5 | - (wajib untuk trading) |
+| `MT5_PASSWORD` | Password akun MT5 | - (wajib untuk trading) |
+| `MT5_SERVER` | Nama server broker MT5 | - (wajib untuk trading) |
+| `MT5_PATH` | Path instalasi MT5 di container | auto-detect |
+| `MT5_ENABLE_TRADING` | Aktifkan fitur trading | `false` |
+| `MT5_RISK_PERCENT` | Risiko per trade (% dari balance) | `1.0` |
+| `MT5_MAX_POSITIONS` | Maksimum posisi terbuka | `5` |
+
+### Konfigurasi MT5 di .env
+
+```bash
+# .env
+TELEGRAM_BOT_TOKEN=your_token
+GEMINI_API_KEY=your_key
+BOT_MODE=polling
+
+# MT5 Auto-Trading
+MT5_LOGIN=12345678
+MT5_PASSWORD=your_mt5_password
+MT5_SERVER=YourBroker-Demo
+MT5_ENABLE_TRADING=true
+MT5_RISK_PERCENT=1.0
+MT5_MAX_POSITIONS=5
+```
+
+### Perintah Bot MT5
+
+| Perintah | Fungsi |
+|----------|--------|
+| `/mt5status` | Cek status koneksi MT5 |
+| `/positions` | Lihat posisi terbuka |
+| `/trade <SYMBOL> <BUY/SELL> <LOT>` | Eksekusi trade manual |
+| `/close <TICKET>` atau `/close all` | Tutup posisi |
+| `/autotrade <on/off>` | Toggle auto-trading |
+
+### Port yang Digunakan
+
+| Port | Fungsi |
+|------|--------|
+| 5000 | Webhook server |
+| 5900 | VNC (akses desktop MT5) |
+| 8001 | MT5 bridge (internal) |
+
+### Akses VNC ke Desktop MT5
+
+Untuk melihat GUI MetaTrader 5:
+
+```bash
+# Gunakan VNC viewer ke localhost:5900
+vncviewer localhost:5900
+```
+
+### Catatan Penting MT5
+
+1. **Mode Demo dulu**: Selalu test dengan akun demo sebelum akun real
+2. **Risk Management**: Atur `MT5_RISK_PERCENT` sesuai toleransi risiko
+3. **Monitoring**: Gunakan VNC untuk memantau status MT5
+4. **Wine Limitation**: Beberapa fitur MT5 mungkin terbatas di Wine
+
 ## Catatan Keamanan
 
 - Jangan commit file `.env` ke repository
 - Gunakan Docker secrets untuk production
 - Pastikan SSL certificate valid untuk webhook
 - Batasi akses port 5000 dari reverse proxy saja
+- **Lindungi kredensial MT5** - jangan share password trading
